@@ -99,7 +99,8 @@ class HourglassModel():
         self.data_stream_test = data_stream_test
         self.img_scale = img_scale
     # ACCESSOR
-    
+        if not os.path.exists(saver_directory):
+            os.makedirs(saver_directory)
     def get_input(self):
         """ Returns Input (Placeholder) Tensor
         Image Input :
