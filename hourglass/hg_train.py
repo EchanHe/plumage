@@ -3,7 +3,7 @@ TRAIN LAUNCHER
 
 """
 
-import configparser
+
 import tensorflow as tf
 
 from hourglass_tiny import HourglassModel
@@ -12,43 +12,21 @@ import os
 import pandas as pd
 import sys
 # import hg_data_input
+dirname = os.path.dirname(__file__)
+input_lib_dir= os.path.abspath(os.path.join(dirname,"../input"))
+util_lib_dir= os.path.abspath(os.path.join(dirname,"../util"))
+sys.path.append(input_lib_dir)
+sys.path.append(util_lib_dir)
+import data_input
+from plumage_config import process_config , save_config
 
 
-
-def process_config(conf_file):
-    """
-    """
-    params = {}
-    config = configparser.ConfigParser()
-    config._interpolation = configparser.ExtendedInterpolation()
-    config.read(conf_file)
-    for section in config.sections():
-        if section == 'Directory':
-            for option in config.options(section):
-                params[option] = config.get(section, option)
-        if section == 'DataSetHG':
-            for option in config.options(section):
-                params[option] = eval(config.get(section, option))
-        if section == 'Network':
-            for option in config.options(section):
-                params[option] = eval(config.get(section, option))
-        if section == 'Train':
-            for option in config.options(section):
-                params[option] = eval(config.get(section, option))
-        if section == 'Validation':
-            for option in config.options(section):
-                params[option] = eval(config.get(section, option))
-        if section == 'Saver':
-            for option in config.options(section):
-                params[option] = eval(config.get(section, option))
-    return params
 
 print('--Parsing Config File')
-params = process_config('config_hg.cfg')
+config_name = 'config_hg.cfg'
 
-input_lib_dir= os.path.abspath(os.path.join(params['work_dir'],"input"))
-sys.path.append(input_lib_dir)
-import data_input
+params = process_config(os.path.join(dirname, config_name))
+save_config(os.path.join(dirname, config_name) , params['saver_directory'])
 
 
 print("Read training set data: ...")

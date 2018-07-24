@@ -34,6 +34,7 @@ import sys
 import datetime
 import os
 import cv2
+from datetime import date
 
 class HourglassModel():
     """ HourglassModel class: (to be renamed)
@@ -422,7 +423,7 @@ class HourglassModel():
                 print('Epoch ' + str(epoch) + '/' + str(nEpochs) + ' done in ' + str(int(epochfinishTime-epochstartTime)) + ' sec.' 
                     + ' -avg_time/batch: ' + str(((epochfinishTime-epochstartTime)/epochSize))[:4] + ' sec.')
                 with tf.name_scope('save'):
-                    self.saver.save(self.Session, os.path.join(self.saver_directory,str(self.name + '_' + str(int(global_step/epochSize)))))
+                    self.saver.save(self.Session, os.path.join(self.saver_directory,str(str(date.today()) + '_' +self.name + '_' + str(int(global_step/epochSize)))))
                 self.resume['loss'].append(cost)
 
                 #################

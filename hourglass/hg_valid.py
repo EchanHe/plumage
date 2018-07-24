@@ -3,7 +3,6 @@ TRAIN LAUNCHER
 
 """
 
-import configparser
 import tensorflow as tf
 
 from hourglass_tiny import HourglassModel
@@ -13,41 +12,19 @@ import pandas as pd
 from  plumage_util import Accuracy, heatmap_to_coord , write_coord
 import sys
 
-def process_config(conf_file):
-    """
-    """
-    params = {}
-    config = configparser.ConfigParser()
-    config._interpolation = configparser.ExtendedInterpolation()
-    config.read(conf_file)
-    for section in config.sections():
-        if section == 'Directory':
-            for option in config.options(section):
-                params[option] = config.get(section, option)
-        if section == 'DataSetHG':
-            for option in config.options(section):
-                params[option] = eval(config.get(section, option))
-        if section == 'Network':
-            for option in config.options(section):
-                params[option] = eval(config.get(section, option))
-        if section == 'Train':
-            for option in config.options(section):
-                params[option] = eval(config.get(section, option))
-        if section == 'Validation':
-            for option in config.options(section):
-                params[option] = eval(config.get(section, option))
-        if section == 'Saver':
-            for option in config.options(section):
-                params[option] = eval(config.get(section, option))
-    return params
+dirname = os.path.dirname(__file__)
+input_lib_dir= os.path.abspath(os.path.join(dirname,"../input"))
+util_lib_dir= os.path.abspath(os.path.join(dirname,"../util"))
+sys.path.append(input_lib_dir)
+sys.path.append(util_lib_dir)
+import data_input
+from plumage_config import process_config
+
+
 
 print('--Parsing Config File')
 params = process_config('config_hg.cfg')
 
-
-input_lib_dir= os.path.abspath(os.path.join(params['work_dir'],"input"))
-sys.path.append(input_lib_dir)
-import data_input
 
 rootdir = params['work_dir']
 img_path =  params['img_folder']
