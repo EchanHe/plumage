@@ -9,17 +9,31 @@ import cv2
 #General function for 
 
 
+
+
+
+#img [height, width, 3]
+#coords [x,y, x,y]
+def show_images_coords(img, coords):
+    cols_num_per_coord = 2
+    lm_cnt = coords.shape[0]//cols_num_per_coord
+
+    for i_col in range(lm_cnt):
+        x = coords[ i_col * cols_num_per_coord]
+        y = coords[ i_col * cols_num_per_coord +1] 
+        if x >= 0 and ~np.isnan(x):
+            plt.plot(x, y, 'x' , alpha=0.8 , mew = 4 , mec = 'cyan' )
+
+    plt.imshow(img)
+
+
+
 ##Save imgs 
 
 #params
 #   filnames: list of file names (m,1)
 #   pred_coords: matrix of predicted coord (m , n*2)
 #   gt_coords: matrix of Ground Truth cood (m, n*2) x1,y1,x2,y2
-
-
-def save_img_with
-
-
 
 def save_imgs_gt_pred(file_names, pred_coord, gt_coords ,lm_cnt, cols_num_per_coord , width,height,scale ,
  images_folder , output_folder , pck_threshold =10, draw_scale = True , dis_width=256, dis_height=170):

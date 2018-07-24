@@ -24,6 +24,8 @@ class Network:
 
         self.is_train = config['is_train']
         self.output_stride = config['output_stride']
+        self.decay = config['learning_rate_decay']
+        self.decay_step = config['decay_step']
 
         self.images = tf.placeholder(
                 dtype = tf.float32,
@@ -42,6 +44,7 @@ class Network:
                 dtype = tf.float32,
                 shape = (None, self.img_height, self.img_width, 3)
                 )
+
         print("Deeplab:")
         print("Batch size: {}, Output stride: {}\nNumber of class: {}".format(self.batch_size , self.output_stride,
             self.class_num))
@@ -51,7 +54,8 @@ class Network:
         """
         损失函数  
         """
-        return tf.add_n(tf.get_collection('losses'), name = "total_loss")
+        return tf.add( tf.add_n(tf.get_collection('losses'))  , 
+            tf.reduce_sum(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)) , name = "total_loss")
 
     def add_to_loss(self , predicts ):
 
@@ -96,7 +100,7 @@ class Network:
         self._loss_summary(total_loss)
 
         self.learning_rate = tf.train.exponential_decay(self.start_learning_rate, global_step,
-                                                   1000, 0.8, staircase=True)
+                                                   self.decay_step, self.decay, staircase=True)
 
         optimizer = tf.train.MomentumOptimizer(learning_rate=self.learning_rate, momentum = 0.9)
         grads = optimizer.compute_gradients(total_loss)

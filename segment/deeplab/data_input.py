@@ -17,7 +17,7 @@ import os, errno
 from random import randint,uniform,choice,random
 import math
 from PIL import ImageEnhance,ImageChops,ImageOps,ImageFilter
-
+import sys
 
         
 class plumage_data_input:
@@ -34,10 +34,17 @@ class plumage_data_input:
      'poly.throat', 'poly.breast', 'poly.belly', 'poly.tail.underside']
     coords_cols = ['s02.standard_x', 's02.standard_y', 's20.standard_x', 's20.standard_y',
        's40.standard_x', 's40.standard_y', 's80.standard_x', 's80.standard_y',
-       's99.standard_x', 's99.standard_y']
+       's99.standard_x', 's99.standard_y','crown_x', 'crown_y', 'nape_x',
+       'nape_y', 'mantle_x', 'mantle_y', 'rump_x', 'rump_y', 'tail_x',
+       'tail_y', 'throat_x', 'throat_y', 'breast_x', 'breast_y', 'belly_x',
+       'belly_y', 'tail.underside_x', 'tail.underside_y', 'wing.coverts_x',
+       'wing.coverts_y', 'wing.primaries.secondaries_x',
+       'wing.primaries.secondaries_y']
     contour_col = ["poly.outline" ]
     cols_num_per_coord = 2
     lm_cnt = int(len(coords_cols) /  cols_num_per_coord)
+    
+    aug_option = {'trans' :False , 'rot' :True , 'scale' :True}
     def __init__(self,df,batch_size,is_train,pre_path, state,scale=1 ,is_aug = True):
 
         self.df  =df# "train_pad/Annotations/train_"+categories.get_cate_name(cates)+"_coord.csv"
@@ -64,6 +71,8 @@ class plumage_data_input:
             .format(self.df_size, self.batch_size ,self.img_width , self.img_height, self.is_aug))
 
         
+        
+        
 
     def get_next_batch(self):
         batch_size = self.batch_size
@@ -82,7 +91,7 @@ class plumage_data_input:
         self.start_idx += batch_size
         #returning X and y 
         if self.is_aug:
-            x_mini, df_mini = self.get_x_df_aug(df_mini,folder =self.pre_path)
+            x_mini, df_mini = self.get_x_df_aug(df_mini)
         else:
             x_mini = self.get_x_img(df_mini)
         # print(df_mini)
@@ -383,30 +392,27 @@ class plumage_data_input:
 
 
 
-    def get_x_df_aug(self ,df, folder ="train_pad/"):
+    def get_x_df_aug(self ,df):
+        folder = self.pre_path
         l_m_columns = self.coords_cols
-
         scale = self.scale
-        filepath_test = folder+df.iloc[0,0]
-        img = Image.open(filepath_test)
-        # np_img = np.array(img)
-        # img = img.resize((int(np_img.shape[1]/scale),int(np_img.shape[0]/scale)))
-        # x_all =np.expand_dims( np.array(img) , axis=0)
+
         size= df.shape[0]  
         width = int(self.img_width/scale)
         height = int(self.img_height/scale)
 
-        size= df.shape[0]  
-
-        x_all = np.zeros((size,height,width,3))
+        x_all = np.zeros((size, height , width,3))
 
         img_id=0
 
         for idx,row in df.iterrows(): 
-            filepath = folder+row[self.file_name_col]
-            img = Image.open(filepath)
+            filename = folder+row[self.file_name_col]
+            img = cv2.imread(filename)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img_hei = img.shape[0]
+            img_wid = img.shape[1]
+#             img = cv2.resize(img, dsize=(width,height), interpolation=cv2.INTER_CUBIC)
             aug_prob = 1
-    #         print(aug_prob)
             if aug_prob > 0.5:
                 
                 #-----平移----
@@ -415,123 +421,122 @@ class plumage_data_input:
                 trans_lr = choice([randint(min_offset,max_offset) , randint(-max_offset,-min_offset)] ) #left/right (i.e. 5/-5)
 
                 trans_ud = choice([randint(min_offset,max_offset) , randint(-max_offset,-min_offset)] ) #up/down (i.e. 5/-5)
+
+                
                 old_row = row.copy()
                 for i in np.arange(0,len(l_m_columns),self.cols_num_per_coord):
                     id_x = l_m_columns[i]
                     id_y = l_m_columns[i+1]
                     id_vis = l_m_columns[i]
                     if row[id_vis] !=-1:
-                        row[id_x] = row[id_x] - trans_lr
-                        row[id_y] = row[id_y] - trans_ud
-
+                        row[id_x] = row[id_x] + trans_lr
+                        row[id_y] = row[id_y] + trans_ud
                         inside = row[id_x]>self.img_width or row[id_x]<0 or row[id_y]>self.img_height or row[id_y]<0 
                         if inside:
                             trans_lr=0
                             trans_ud = 0
                             row= old_row
                             break
-                img = img.transform(img.size, Image.AFFINE, (1, 0, trans_lr, 0, 1, trans_ud))
+                M = np.float32([[1,0,trans_lr],[0,1,trans_ud]])
+                
+                img = cv2.warpAffine(img,M,(img_wid,img_hei))
+#                 img = img.transform(img.size, Image.AFFINE, (1, 0, trans_lr, 0, 1, trans_ud))
                 
 
                 
                 
-                # ---------旋转--------
-                angle_bound = 30
-                angle = randint(-angle_bound,angle_bound)
-                # angle =15
-                radian = math.pi/180*angle
-                print(angle)
+                # ---------Rotate--------
+                if self.aug_option['rot']:
+                    angle_bound = 30
+                    angle = randint(-angle_bound,angle_bound)
+                    # angle =15
+                    radian = math.pi/180*angle
 
-                old_row = row.copy()
-                for i in np.arange(0,len(l_m_columns),self.cols_num_per_coord):
-                    id_x = l_m_columns[i]
-                    id_y = l_m_columns[i+1]
-                    id_vis = l_m_columns[i]
-                    if row[id_vis] !=-1:
-                        x = row[id_x] - self.img_width/2
-                        y = (self.img_height- row[id_y])
-                        y=y- self.img_height/2 
-                        row[id_x] = x*math.cos(radian) - ((y)*math.sin(radian))
-                        row[id_x] =int((row[id_x] + self.img_width/2))
-                        row[id_y] =(x*math.sin(radian) + ((y)*math.cos(radian)))
-                        row[id_y] =int ((self.img_height-(row[id_y]+self.img_height/2 )))
-                        inside = row[id_x]>self.img_width or row[id_x]<0 or row[id_y]>self.img_height or row[id_y]<0 
-                        if inside:
-                            angle=0
-                            row= old_row
-                            break
-
-                img = img.rotate(angle)
+                    old_row = row.copy()
+                    for i in np.arange(0,len(l_m_columns),self.cols_num_per_coord):
+                        id_x = l_m_columns[i]
+                        id_y = l_m_columns[i+1]
+                        id_vis = l_m_columns[i]
+                        if row[id_vis] !=-1:
+                            x = row[id_x] - self.img_width/2
+                            y = (self.img_height- row[id_y])
+                            y=y- self.img_height/2 
+                            row[id_x] = x*math.cos(radian) - ((y)*math.sin(radian))
+                            row[id_x] =int((row[id_x] + self.img_width/2))
+                            row[id_y] =(x*math.sin(radian) + ((y)*math.cos(radian)))
+                            row[id_y] =int ((self.img_height-(row[id_y]+self.img_height/2 )))
+                            inside = row[id_x]>self.img_width or row[id_x]<0 or row[id_y]>self.img_height or row[id_y]<0 
+                            if inside:
+                                angle=0
+                                row= old_row
+                                break
+                    M = cv2.getRotationMatrix2D((img_wid/2,img_hei/2),angle,1)
+                    img = cv2.warpAffine(img,M,(img_wid,img_hei))
+#                     img = img.rotate(angle)
                 
                 
-                ##-----缩放------
-                scale_ratio = randint(10,20)/10
-                # scale_ratio=2
-    #             scaled_wid
-    #             scaled_height = int()
-                new_scaled_width = (int(self.img_width/scale_ratio))
-                new_scaled_height = (int(self.img_height/scale_ratio))
-
-                img = img.resize((new_scaled_width,new_scaled_height))
-                delta_w = self.img_width - new_scaled_width
-                delta_h = self.img_height - new_scaled_height
-                padding = (delta_w//2, delta_h//2, delta_w-(delta_w//2), delta_h-(delta_h//2))
-                img = ImageOps.expand(img, padding)
-                for i in np.arange(0,len(l_m_columns),self.cols_num_per_coord):
-                    id_x = l_m_columns[i]
-                    id_y = l_m_columns[i+1]
-                    id_vis = l_m_columns[i]
-                    if row[id_vis] !=-1:
-                        # print(row[id_x]  , row[id_y])
-                        row[id_x] = (row[id_x] + delta_w)//scale_ratio
-                        row[id_y] = (row[id_y] + delta_h)//scale_ratio
-    #                     print(row[id_x]  , row[id_y])
-
-                
+                ##-----Scale------
+                if self.aug_option['scale']:
+                    #scale value:
+                    scale_ratio = randint(10,20)/10
+#                     scale_ratio = 1.5
+                    new_scaled_width = (int(self.img_width/scale_ratio))
+                    new_scaled_height = (int(self.img_height/scale_ratio))
                     
-                #----图片属性操作----#
-
-                aug_type = randint(0,3)
-    #             print(aug_type)
-                if random()>0.7:
-                    value =choice([uniform(0.3,0.7) , uniform(1.5,2.0)] )
-                    value = round(value,1)
-            
-                    enhancer = ImageEnhance.Contrast(img)
-                    img = enhancer.enhance(value)
-                if random()>0.7:   
-                    value =choice([uniform(0.3,0.7) , uniform(1.5,2.0)] )
-                    value = round(value,1)
-                    enhancer = ImageEnhance.Brightness(img)
-                    img = enhancer.enhance(value)
-
-                if random() > 0.7:
-                    value =choice([uniform(0.3,0.7) , uniform(1.5,2.0)] )
-                    value = round(value,1)                
-                    enhancer = ImageEnhance.Color(img)
-                    img = enhancer.enhance(value)
-
-                if random() > 0.9:
-                    img = ImageOps.invert(img)
+                    img = cv2.resize(img, dsize=(new_scaled_width,new_scaled_height),
+                                     interpolation=cv2.INTER_CUBIC)
+                    delta_w = self.img_width - new_scaled_width
+                    delta_h = self.img_height - new_scaled_height
                     
-                sharp_blur = random()
-                if sharp_blur>0.7:
-                    img = img.filter(ImageFilter.UnsharpMask)
-                elif sharp_blur<0.3:
-                    img = img.filter(ImageFilter.BLUR)
-                
-            # for i in np.arange(0,len(l_m_columns),3):
-            #     id_x = l_m_columns[i]
-            #     id_y = l_m_columns[i+1]
-            #     id_vis = l_m_columns[i]
-            #     if row[id_vis] !=-1:
-            #         row[id_x] = int(row[id_x]/scale)
-            #         row[id_y] = int(row[id_y]/scale)
+                    img= cv2.copyMakeBorder(img,delta_h//2,delta_h-(delta_h//2),
+                                            delta_w//2,delta_w-(delta_w//2),
+                                            cv2.BORDER_CONSTANT,value=[0,0,0])
+                    
+                    for i in np.arange(0,len(l_m_columns),self.cols_num_per_coord):
+                        id_x = l_m_columns[i]
+                        id_y = l_m_columns[i+1]
+                        id_vis = l_m_columns[i]
+                        if row[id_vis] !=-1:
+                            row[id_x] = (row[id_x] )//scale_ratio+ delta_w//2
+                            row[id_y] = (row[id_y])//scale_ratio + delta_h//2
+
+
+#                 img[...,2]+100
+                    
+                #---Intensity and enhance---#
+                if False:
+                    aug_type = randint(0,3)
+        #             print(aug_type)
+                    if random()>0.7:
+                        value =choice([uniform(0.3,0.7) , uniform(1.5,2.0)] )
+                        value = round(value,1)
+
+                        enhancer = ImageEnhance.Contrast(img)
+                        img = enhancer.enhance(value)
+                    if random()>0.7:   
+                        value =choice([uniform(0.3,0.7) , uniform(1.5,2.0)] )
+                        value = round(value,1)
+                        enhancer = ImageEnhance.Brightness(img)
+                        img = enhancer.enhance(value)
+
+                    if random() > 0.7:
+                        value =choice([uniform(0.3,0.7) , uniform(1.5,2.0)] )
+                        value = round(value,1)                
+                        enhancer = ImageEnhance.Color(img)
+                        img = enhancer.enhance(value)
+
+                    if random() > 0.9:
+                        img = ImageOps.invert(img)
+
+                    sharp_blur = random()
+                    if sharp_blur>0.7:
+                        img = img.filter(ImageFilter.UnsharpMask)
+                    elif sharp_blur<0.3:
+                        img = img.filter(ImageFilter.BLUR)
+
             df.loc[idx,:] = row      
-            
-            img = img.resize((width,height))
-            np_img = np.array(img)
-            x_all[img_id,:,:,:] = np_img
+            img = cv2.resize(img, dsize=(width,height), interpolation=cv2.INTER_CUBIC)
+            x_all[img_id,:,:,:] = img
             img_id+=1
             
         return x_all.astype('uint8'),df
