@@ -64,10 +64,10 @@ if params['category'] is not None:
     df_valid = df_valid.loc[df_valid.view==params["category"],:].reset_index(drop = True)
 # df=df[:1]
 
-df_train=df_train[:1]
+# df_train=df_train[:1]
 input_data = data_input.plumage_data_input(df_train,params['batch_size'],scale = params['scale'], state = params['data_state'],
                                          is_train=True , pre_path = params['img_folder'],is_aug=params['img_aug'] )
-df_valid = df_valid[:1]
+# df_valid = df_valid[:1]
 print("Read valid set data: ...")
 # df_valid = df_valid[:1]
 valid_data = data_input.plumage_data_input(df_valid,params['batch_size'],scale = params['scale'], state = params['data_state'],
