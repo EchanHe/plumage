@@ -52,7 +52,7 @@ print("Read valid set data: ...")
 # df_valid = df_valid[:1]
 valid_data = data_input.plumage_data_input(df_valid,params['batch_size'],scale = params['scale'], state = params['data_state'],
                                          is_train=True , pre_path = params['img_folder'],is_aug=params['img_aug'] )
-epochSize = data_input.df_size
+epochSize = input_data.df_size
 total_steps = epochSize * nEpochs
 summary_steps = total_steps // params['summary_interval']
 
