@@ -55,7 +55,7 @@ def save_config(conf_file , save_dir):
         file_name ="{}_{}_{}_config".format(str(date.today()), params['Network']['name'],
                                  params['DataSetHG']['category'])
     else:
-        file_name ="{}_{}_all".format(str(date.today()), params['Network']['name'])
+        file_name ="{}_{}_all_config".format(str(date.today()), params['Network']['name'])
     file_path = os.path.join(save_dir, file_name)   
     print('Config saved in:',file_path)
     with open(file_path, 'w') as outfile:
