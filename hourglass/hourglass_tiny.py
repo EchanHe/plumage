@@ -367,7 +367,7 @@ class HourglassModel():
                 avg_cost = 0.
                 cost = 0.
                 print('Epoch :' + str(epoch) + '/' + str(nEpochs) + '\n')
-                # Training Set
+                # ---Training---
                 for i in range(epochSize):
                     global_step = self.Session.run(self.train_step)
                     ## data input    
@@ -382,7 +382,7 @@ class HourglassModel():
                     feed_dict = {self.img : X_train_mini, self.gtMaps: y_stack_mini,self.visMaps: vis_stack_mini}
 
                     # print(i,saveStep)
-                    if i % saveStep == 0:
+                    if (i+1) % saveStep == 0:
                         # print("in save step")
                         _, c, summary = self.Session.run([self.train_rmsprop, self.loss, self.train_op], 
                             feed_dict = {self.img : X_train_mini, self.gtMaps: y_stack_mini,self.visMaps: vis_stack_mini,self.joint_accur_v2:coord_accuracy})
@@ -396,12 +396,9 @@ class HourglassModel():
                     avg_cost += c/epochSize
 
                     if (i+1) % saveStep == 0 or i+1 ==epochSize:
-                        print("\n accuracy")
                         output =  self.Session.run(self.output, feed_dict = feed_dict)
 
                         coord_accuracy= self.coord_accuracy(output , coords_mini).astype(int)
-                        print(coord_accuracy)
-                        print(coord_accuracy.shape)
                         print("cost ", c)
 
                         percent = ((i+1)/epochSize) * 100
@@ -411,7 +408,7 @@ class HourglassModel():
                          '||' + str(percent)[:4] + '%' + ' -cost: ' + str(cost) + ' -avg_loss: ' +
                           str(avg_cost)[:5] + ' -timeToEnd: ' + str(tToEpoch) + ' sec.' )
                         sys.stdout.flush()
-
+                # ---END Training---
 
                 epochfinishTime = time.time()
                 #Save Weight (axis = epoch)
@@ -423,7 +420,7 @@ class HourglassModel():
                 print('Epoch ' + str(epoch) + '/' + str(nEpochs) + ' done in ' + str(int(epochfinishTime-epochstartTime)) + ' sec.' 
                     + ' -avg_time/batch: ' + str(((epochfinishTime-epochstartTime)/epochSize))[:4] + ' sec.')
                 with tf.name_scope('save'):
-                    self.saver.save(self.Session, os.path.join(self.saver_directory,str(str(date.today()) + '_' +self.name + '_' + str(int(global_step/epochSize)))))
+                    self.saver.save(self.Session, os.path.join(self.saver_directory,str(str(date.today()) + '_' + self.name + '_' + str(int(global_step/epochSize) + 1))))
                 self.resume['loss'].append(cost)
 
                 #################

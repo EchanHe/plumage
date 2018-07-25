@@ -1,0 +1,7 @@
+*ipynb
+*.zip
+params
+log
+result
+result_visualization
+__pycache__

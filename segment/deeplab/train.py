@@ -15,6 +15,12 @@ import metrics
 from datetime import date
 
 
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument("cate", default = None, choices=["back" ,"belly","side" ],
+                    help="The type of viewing")
+args = parser.parse_args()
+
 dirname = os.path.dirname(__file__)
 input_lib_dir= os.path.abspath(os.path.join(dirname,"../../input"))
 util_lib_dir= os.path.abspath(os.path.join(dirname,"../../util"))
@@ -42,12 +48,14 @@ train_op = model.train_op(loss, model.global_step)
 
 ##reading data###
 
-train_csv = pd.read_csv(params['train_file'])
+df_train = pd.read_csv(params['train_file'])
 
 
 
-valid_csv = pd.read_csv(params['valid_file'])
+df_valid = pd.read_csv(params['valid_file'])
 
+params['category'] = args.cate
+print(params['category'])
 if params['category'] is not None:
     params['name'] +='_' + params['category']
     df_train = df_train.loc[df_train.view==params["category"],:].reset_index(drop = True)
@@ -58,11 +66,11 @@ if params['category'] is not None:
 # valid_csv = valid_csv[0:5]
 
 print("Read training data ....")
-train_data = data_input.plumage_data_input(train_csv,batch_size=params['batch_size'],is_train =params['is_train'],
+train_data = data_input.plumage_data_input(df_train,batch_size=params['batch_size'],is_train =params['is_train'],
                            pre_path =params['img_folder'],state=params['data_state'],
                            scale=params['scale'] ,is_aug = params['img_aug'])
 print("Read valid data ....")
-valid_data = data_input.plumage_data_input(valid_csv,batch_size=params['batch_size'],is_train =params['is_train'],
+valid_data = data_input.plumage_data_input(df_valid,batch_size=params['batch_size'],is_train =params['is_train'],
                            pre_path =params['img_folder'],state=params['data_state'],
                            scale=params['scale'] ,is_aug = params['img_aug'])
 
@@ -142,7 +150,7 @@ with tf.Session() as sess:
             #write the validation result
             acc_list = np.array([])
             loss_list = np.array([])
-            for i_df_valid in np.arange(0,valid_csv.shape[0],params["batch_size"]):
+            for i_df_valid in np.arange(0,df_valid.shape[0],params["batch_size"]):
                 x,y_valid = valid_data.get_next_batch_no_random()
                 feed_dict = {
                     model.images: x,
@@ -155,7 +163,7 @@ with tf.Session() as sess:
                 acc_iou = metrics.segs_eval(np.argmax(result_mini,axis = 3),np.argmax(y_valid,axis = 3),mode="miou")
                 
                 acc = np.sum(np.argmax(result_mini,axis=3) == np.argmax(y_valid,axis=3)) / np.argmax(y_valid,axis=3).size
-                print("valid pixekofl accuracy: ", acc)
+                # print("valid pixekofl accuracy: ", acc)
                 
                 acc_list = np.append(acc_list,acc_iou)
                 loss_list = np.append(loss_list,_loss)

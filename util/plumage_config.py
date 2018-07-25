@@ -52,7 +52,7 @@ def save_config(conf_file , save_dir):
             for option in config.options(section):
                 params[section][option] = eval(config.get(section, option))
     if params['DataSetHG']['category'] is not None:
-        file_name ="{}_{}_{}".format(str(date.today()), params['Network']['name'],
+        file_name ="{}_{}_{}_config".format(str(date.today()), params['Network']['name'],
                                  params['DataSetHG']['category'])
     else:
         file_name ="{}_{}_all".format(str(date.today()), params['Network']['name'])

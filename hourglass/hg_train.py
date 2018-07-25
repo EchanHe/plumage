@@ -40,6 +40,8 @@ if params['category'] is not None:
     params['name'] +='_' + params['category']
     df_train = df_train.loc[df_train.view==params["category"],:].reset_index(drop = True)
     df_valid = df_valid.loc[df_valid.view==params["category"],:].reset_index(drop = True)
+elif params['category'] is None or params['category'] =='all':
+    params['name'] +='_' + 'all'
 # df=df[:1]
 
 # df_train=df_train[:1]
