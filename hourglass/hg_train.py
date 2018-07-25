@@ -11,6 +11,7 @@ from hourglass_tiny import HourglassModel
 import os
 import pandas as pd
 import sys
+import plumage_util
 # import hg_data_input
 dirname = os.path.dirname(__file__)
 input_lib_dir= os.path.abspath(os.path.join(dirname,"../input"))
@@ -26,7 +27,7 @@ print('--Parsing Config File')
 config_name = 'config_hg.cfg'
 
 params = process_config(os.path.join(dirname, config_name))
-save_config(os.path.join(dirname, config_name) , params['saver_directory'])
+# save_config(os.path.join(dirname, config_name) , params['saver_directory'])
 
 
 print("Read training set data: ...")
@@ -44,16 +45,16 @@ elif params['category'] is None or params['category'] =='all':
     params['name'] +='_' + 'all'
 # df=df[:1]
 
-# df_train=df_train[:1]
+# df_train=df_train[:25]
 input_data = data_input.plumage_data_input(df_train,params['batch_size'],scale = params['scale'], state = params['data_state'],
                                          is_train=True , pre_path = params['img_folder'],is_aug=params['img_aug'] )
 # df_valid = df_valid[:1]
 print("Read valid set data: ...")
-# df_valid = df_valid[:1]
+# df_valid = df_valid[:10]
 valid_data = data_input.plumage_data_input(df_valid,params['batch_size'],scale = params['scale'], state = params['data_state'],
                                          is_train=True , pre_path = params['img_folder'],is_aug=params['img_aug'] )
 epochSize = input_data.df_size
-total_steps = epochSize * params['nepochs']
+total_steps = (epochSize * params['nepochs']) //params["batch_size"]
 summary_steps = total_steps // params['summary_interval']
 
 
@@ -67,4 +68,18 @@ model = HourglassModel(img_width = params['img_width'],img_height=params['img_he
                        tiny= params['tiny'], w_loss=params['weighted_loss'],w_summary=True , joints= params['joint_list'],modif=False)
 model.generate_model()
 load_file = None
-model.training_init(nEpochs=params['nepochs'], epochSize=epochSize, saveStep=summary_steps, load = load_file)
+model.training_init(nEpochs=params['nepochs'], epochSize=total_steps, saveStep=summary_steps, load = load_file)
+
+
+heatmaps = model.get_heatmaps(load = load_file)
+print("Output heatmaps result. Shape: "+ str(heatmaps.shape))
+
+
+df_file_names = valid_data.df[valid_data.file_name_col]
+gt_coords = valid_data.df[valid_data.coords_cols].as_matrix()
+lm_cnt = valid_data.lm_cnt
+
+
+pred_coord = plumage_util.heatmap_to_coord(heatmaps , valid_data.img_width , valid_data.img_height)
+
+plumage_util.write_point_result(pred_coord , gt_coords ,lm_cnt , params , params['valid_result_dir'])

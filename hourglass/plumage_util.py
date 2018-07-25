@@ -143,3 +143,38 @@ def write_pred_dataframe(gt_df , pred_coords , folder,file_name = "hg_valid_data
     pred_file_name = folder + file_name+"_pred.csv"
     out_data.columns = gt_df.columns
     out_data.to_csv(pred_file_name,index=False)
+
+import json
+from datetime import date
+def get_info_from_params(params):
+    outputs = {}
+    keys = ["name", "category" ,"img_aug", "nepochs" , "learning_rate","batch_size",
+     "decay_step" , "decay_step" , "dropout_rate" , "nlow" ,"nstacks"]
+    for key in keys:
+        assert key in params.keys() , "No this keys, check the config file"
+        outputs[key] = params[key]
+    return outputs
+
+def write_point_result(pred_coord , gt_coords,lm_cnt, params, folder):
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+    pck_threshold = params['pck_threshold']
+    diff_per_pt ,pck= Accuracy(pred_coord , gt_coords, lm_cnt=5 , 
+                                            pck_threshold = params['pck_threshold'],scale = 1)
+    diff_per_pt_all ,pck_all= Accuracy(pred_coord , gt_coords, lm_cnt=lm_cnt , 
+                                            pck_threshold = params['pck_threshold'],scale = 1)
+    result = {}
+    result['config'] = get_info_from_params(params)
+    result['pck-{}'.format(pck_threshold)] =pck.tolist()
+    result['pixel_diff'] = diff_per_pt.tolist()
+    result['mean_pck-{}'.format(pck_threshold)] =np.mean(pck)
+
+    result['pck_all-{}'.format(pck_threshold)] =pck_all.tolist()
+    result['pixel_diff_all'] = diff_per_pt_all.tolist()
+    result['mean_pck_all-{}'.format(pck_threshold)] =np.mean(pck_all)
+
+    result_name = str(date.today()) + "_" +params["name"]
+    print("write into: ", result_name)
+    f = open(folder+result_name,"w")
+    f.write(json.dumps(result ,indent=2))
+    f.close()

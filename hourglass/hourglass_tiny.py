@@ -406,7 +406,7 @@ class HourglassModel():
                         tToEpoch = int((time.time() - epochstartTime) * (100 - percent)/(percent))
                         sys.stdout.write('\r Train: {0}>'.format("="*num) + "{0}>".format(" "*(20-num)) +
                          '||' + str(percent)[:4] + '%' + ' -cost: ' + str(cost) + ' -avg_loss: ' +
-                          str(avg_cost)[:5] + ' -timeToEnd: ' + str(tToEpoch) + ' sec.' )
+                          str(avg_cost)[:5] + ' -timeToEnd: ' + str(tToEpoch) + ' sec.\n' )
                         sys.stdout.flush()
                 # ---END Training---
 
