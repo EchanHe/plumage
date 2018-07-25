@@ -52,16 +52,9 @@ print("Read valid set data: ...")
 # df_valid = df_valid[:1]
 valid_data = data_input.plumage_data_input(df_valid,params['batch_size'],scale = params['scale'], state = params['data_state'],
                                          is_train=True , pre_path = params['img_folder'],is_aug=params['img_aug'] )
-
-if params['test_file'] is not None:
-    pred_file = os.path.join(rootdir , params['test_file'])
-    img_path = os.path.join(rootdir ,params['test_img_folder'])
-    df_test = pd.read_csv(pred_file)
-    # df_valid = df_valid[:1]
-    print("Read test set data: ...")
-    test_data = hg_data_input.hg_data_input(df_test,params['batch_size'],scale = params['scale'],
-                                             is_train=False , pre_path = img_path,is_aug=params['img_aug'] )
-
+epochSize = data_input.df_size
+total_steps = epochSize * nEpochs
+summary_steps = total_steps // params['summary_interval']
 
 
 model = HourglassModel(img_width = params['img_width'],img_height=params['img_height'] ,img_scale = params['scale'],
@@ -74,4 +67,4 @@ model = HourglassModel(img_width = params['img_width'],img_height=params['img_he
                        tiny= params['tiny'], w_loss=params['weighted_loss'],w_summary=True , joints= params['joint_list'],modif=False)
 model.generate_model()
 load_file = None
-model.training_init(nEpochs=params['nepochs'], epochSize=params['epoch_size'], saveStep=params['saver_step'], load = load_file)
+model.training_init(nEpochs=params['nepochs'], epochSize=epochSize, saveStep=summary_steps, load = load_file)
