@@ -17,7 +17,7 @@ from datetime import date
 
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument("cate", default = None, choices=["back" ,"belly","side" ],
+parser.add_argument("-c","--cate", default = None, choices=["back" ,"belly","side" ],
                     help="The type of viewing")
 args = parser.parse_args()
 
@@ -35,7 +35,7 @@ print('--Parsing Config File')
 config_name = 'config_contour.cfg'
 
 params = process_config(os.path.join(dirname, config_name))
-save_config(os.path.join(dirname, config_name) , params['saver_directory'])
+# save_config(os.path.join(dirname, config_name) , params['saver_directory'])
 
 
 tf.reset_default_graph()
@@ -49,21 +49,19 @@ train_op = model.train_op(loss, model.global_step)
 ##reading data###
 
 df_train = pd.read_csv(params['train_file'])
-
-
-
 df_valid = pd.read_csv(params['valid_file'])
 
-params['category'] = args.cate
+# params['category'] = args.cate
 print(params['category'])
 if params['category'] is not None:
     params['name'] +='_' + params['category']
     df_train = df_train.loc[df_train.view==params["category"],:].reset_index(drop = True)
     df_valid = df_valid.loc[df_valid.view==params["category"],:].reset_index(drop = True)
+elif params['category'] is None or params['category'] =='all':
+    params['name'] +='_' + 'all'
 
-
-# train_csv = train_csv[0:5]
-# valid_csv = valid_csv[0:5]
+# df_train = df_train[0:15]
+# df_valid = df_valid[0:15]
 
 print("Read training data ....")
 train_data = data_input.plumage_data_input(df_train,batch_size=params['batch_size'],is_train =params['is_train'],
@@ -111,10 +109,11 @@ with tf.Session() as sess:
 #     logdir = config.logdir
 
     writer = tf.summary.FileWriter(logdir, sess.graph)
+
     valid_loss_ph = tf.placeholder(tf.float32, shape=(), name="valid_loss")
     loss_valid = tf.summary.scalar('loss_valid',valid_loss_ph ) 
-    valid_acc_ph = tf.placeholder(tf.float32, shape=(), name="valid_acc")
-    acc_valid = tf.summary.scalar('m_iou',valid_acc_ph ) 
+    valid_miou_ph = tf.placeholder(tf.float32, shape=(), name="m_iou")
+    miou_valid = tf.summary.scalar('m_iou',valid_miou_ph ) 
 
     
     
@@ -148,34 +147,43 @@ with tf.Session() as sess:
             
         if (i+1) % valid_steps ==0:
             #write the validation result
-            acc_list = np.array([])
+            miou_list = np.array([])
+            cor_pred_list =np.array([])
             loss_list = np.array([])
+
             for i_df_valid in np.arange(0,df_valid.shape[0],params["batch_size"]):
                 x,y_valid = valid_data.get_next_batch_no_random()
+                y_valid_segs = np.argmax(y_valid,axis = 3)
                 feed_dict = {
                     model.images: x,
-                    model.labels: np.argmax(y_valid,axis = 3),
+                    model.labels: y_valid_segs,
                     model.labels_by_classes: y_valid
                     }            
                 _loss = sess.run(loss, feed_dict=feed_dict)
 
-                result_mini = sess.run(predict, feed_dict=feed_dict)
-                acc_iou = metrics.segs_eval(np.argmax(result_mini,axis = 3),np.argmax(y_valid,axis = 3),mode="miou")
+                result_mini = np.argmax(sess.run(predict, feed_dict=feed_dict) ,axis =3)
+                acc_iou = metrics.segs_eval(result_mini,y_valid_segs,mode="miou")
+                acc_cor_pred = metrics.segs_eval(result_mini,y_valid_segs,mode="correct_pred")
                 
-                acc = np.sum(np.argmax(result_mini,axis=3) == np.argmax(y_valid,axis=3)) / np.argmax(y_valid,axis=3).size
-                # print("valid pixekofl accuracy: ", acc)
-                
-                acc_list = np.append(acc_list,acc_iou)
+                miou_list = np.append(miou_list,acc_iou)
                 loss_list = np.append(loss_list,_loss)
+                cor_pred_list = np.append(cor_pred_list , acc_cor_pred)
 
-            print("\t VALIDATION {} steps: average acc and loss : {}  {}".format(i+1,np.mean(acc_list),np.mean(loss_list)))
+
+            mean_loss = np.mean(loss_list)
+            mean_miou = np.mean(miou_list)
+            mean_cor_pred = np.mean(cor_pred_list)
+
+            print("\t VALIDATION {} steps: average miou, correct predict and loss : {} {} {}".format(i+1,mean_miou,mean_cor_pred,mean_loss))
 #             miou = metrics.segs_eval(result_with_label,gt_with_label,mode="miou")
-            writer.add_summary(sess.run(loss_valid, feed_dict={valid_loss_ph: np.mean(loss_list)}) , tmp_global_step)  
-            writer.add_summary(sess.run(acc_valid, feed_dict={valid_acc_ph: np.mean(acc_list)}) , tmp_global_step) 
+            writer.add_summary(sess.run(loss_valid, feed_dict={valid_loss_ph: mean_loss}) , tmp_global_step)  
+            writer.add_summary(sess.run(miou_valid, feed_dict={valid_miou_ph: mean_miou}) , tmp_global_step) 
             
         if (i + 1) % saver_steps == 0:
             #Write the parameters
             tmp_global_step = model.global_step.eval()
             epochs = (tmp_global_step*params["batch_size"])//train_data_size
             model.save(sess, saver, save_filename,epochs)
-    
+
+import plumage_util
+plumage_util.write_seg_result(mean_miou, params , params['result_dir'] ,cor_pred = mean_cor_pred)

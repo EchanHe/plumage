@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import os
 import cv2
+
+import json
+from datetime import date
 #General function for 
 
 
@@ -144,9 +147,8 @@ def write_pred_dataframe(gt_df , pred_coords , folder,file_name = "hg_valid_data
     out_data.columns = gt_df.columns
     out_data.to_csv(pred_file_name,index=False)
 
-import json
-from datetime import date
-def get_info_from_params(params):
+
+def get_info_from_params_points(params):
     outputs = {}
     keys = ["name", "category" ,"img_aug", "nepochs" , "learning_rate","batch_size",
      "decay_step" , "decay_step" , "dropout_rate" , "nlow" ,"nstacks"]
@@ -164,7 +166,7 @@ def write_point_result(pred_coord , gt_coords,lm_cnt, params, folder):
     diff_per_pt_all ,pck_all= Accuracy(pred_coord , gt_coords, lm_cnt=lm_cnt , 
                                             pck_threshold = params['pck_threshold'],scale = 1)
     result = {}
-    result['config'] = get_info_from_params(params)
+    result['config'] = get_info_from_params_points(params)
     result['pck-{}'.format(pck_threshold)] =pck.tolist()
     result['pixel_diff'] = diff_per_pt.tolist()
     result['mean_pck-{}'.format(pck_threshold)] =np.mean(pck)
@@ -173,7 +175,7 @@ def write_point_result(pred_coord , gt_coords,lm_cnt, params, folder):
     result['pixel_diff_all'] = diff_per_pt_all.tolist()
     result['mean_pck_all-{}'.format(pck_threshold)] =np.mean(pck_all)
 
-    result_name = str(date.today()) + "_" +params["name"]
+    result_name = "{}_{}.json".format(str(date.today()) ,params["name"])
     print("write into: ", result_name)
     f = open(folder+result_name,"w")
     f.write(json.dumps(result ,indent=2))
