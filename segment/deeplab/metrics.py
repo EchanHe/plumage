@@ -52,7 +52,7 @@ def segs_eval(pred_segms , gt_segms , mode="pixel_acc"):
             sum_acc+= correct_pred(pred_segms[i,...],gt_segms[i,...])
 
 
-    return sum_acc/df_size
+    return round(sum_acc/df_size , 4)
 
 def correct_pred(eval_segm, gt_segm):
     check_size(eval_segm, gt_segm)
