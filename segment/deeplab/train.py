@@ -28,7 +28,7 @@ sys.path.append(input_lib_dir)
 sys.path.append(util_lib_dir)
 import data_input
 from plumage_config import process_config , save_config
-
+import plumage_util
 
 
 print('--Parsing Config File')
@@ -185,5 +185,5 @@ with tf.Session() as sess:
             epochs = (tmp_global_step*params["batch_size"])//train_data_size
             model.save(sess, saver, save_filename,epochs)
 
-import plumage_util
+
 plumage_util.write_seg_result(mean_miou, params , params['result_dir'] ,cor_pred = mean_cor_pred)

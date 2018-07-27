@@ -25,7 +25,7 @@ def segs_to_masks(segs):
 
 #seg [height , width]
 def seg_to_mask(seg):
-    assert len(segs.shape) ==2 , "Make sure input is [height, width]"
+    assert len(seg.shape) ==2 , "Make sure input is [height, width]"
     cl, n_cl = extract_classes(seg)
     return extract_masks(seg , cl, n_cl)
 

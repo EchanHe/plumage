@@ -19,7 +19,57 @@ import math
 from PIL import ImageEnhance,ImageChops,ImageOps,ImageFilter
 import sys
 
-        
+#Check the masks are Mutually Exclusive
+def check_masks(masks):
+    for mask in masks:
+        if not check_mask(mask):
+            return False
+    return True
+
+def check_mask(mask):
+    img_wid = mask.shape[1]
+    img_hei = mask.shape[0]
+    sum_pixel = 0 
+    for c in range(mask.shape[2]):
+        sum_pixel += np.sum(mask[...,c])
+#     print(sum_pixel , img_wid*img_hei)
+    return  sum_pixel == (img_wid*img_hei)
+
+# Change 
+def segs_to_masks(segs):
+    assert len(segs.shape) ==3 , "Make sure input is [batch_size , height, width]"
+    df_size = segs.shape[0]
+    cl, n_cl = extract_classes(segs[0,...] )
+
+    masks = np.zeros((segs.shape[0] , segs.shape[1] , segs.shape[2] , n_cl))
+    for i in np.arange(df_size):
+        masks[i,...] = extract_masks(segs[i,...] , cl, n_cl)
+
+    return masks
+
+def extract_classes(segm):
+    cl = np.unique(segm)
+    n_cl = len(cl)
+
+    return cl, n_cl
+
+def extract_masks(segm, cl, n_cl):
+    h, w  = segm_size(segm)
+    masks = np.zeros((h, w , n_cl))
+
+    for i, c in enumerate(cl):
+        masks[:, : , i] = segm == c
+
+    return masks
+def segm_size(segm):
+    try:
+        height = segm.shape[0]
+        width  = segm.shape[1]
+    except IndexError:
+        raise
+    return height, width
+
+# Data class
 class plumage_data_input:
     """
     读数据的类。
@@ -44,7 +94,7 @@ class plumage_data_input:
     cols_num_per_coord = 2
     lm_cnt = int(len(coords_cols) /  cols_num_per_coord)
     
-    aug_option = {'trans' :False , 'rot' :True , 'scale' :True}
+    aug_option = {'trans' :True , 'rot' :True , 'scale' :True}
     def __init__(self,df,batch_size,is_train,pre_path, state,scale=1 ,is_aug = True):
 
         self.df  =df# "train_pad/Annotations/train_"+categories.get_cate_name(cates)+"_coord.csv"
@@ -69,12 +119,14 @@ class plumage_data_input:
         print("Init data class...")
         print("\tData shape: {}\n\tbatch_size:{}\n\tImage resolution: {}*{}\n\tImage Augmentation:{}"\
             .format(self.df_size, self.batch_size ,self.img_width , self.img_height, self.is_aug))
-
+        print("Augmentation option:" , self.aug_option)
         
         
         
-
+        
+    
     def get_next_batch(self):
+        #Augmentation is only in this next batch.
         batch_size = self.batch_size
         df_size = self.df_size
         is_train = self.is_train
@@ -92,22 +144,35 @@ class plumage_data_input:
         #returning X and y 
         if self.is_aug:
             x_mini, df_mini = self.get_x_df_aug(df_mini)
-        else:
-            x_mini = self.get_x_img(df_mini)
+            
         # print(df_mini)
         if is_train:
             # print(df_mini)
             if self.state =='coords':
+                if self.is_aug:
+                    x_mini, df_mini = self.get_x_df_aug(df_mini)
+                else:
+                    x_mini = self.get_x_img(df_mini)
+                
                 y_mini = self.get_y_map(df_mini)
                 coords_mini = self.get_y_coord(df_mini , 1 , True)
                 vis_mini = self.get_y_vis_map(df_mini)
                 return x_mini , y_mini, coords_mini,vis_mini
-            elif self.state =='patches':
-                y_mini = self.get_y_patches(df_mini)
+            else:
+                x_mini = self.get_x_img(df_mini)
+                y_mini = None
+                if self.state =='patches':
+                    y_mini = self.get_y_patches(df_mini)
+                elif self.state =='contour':
+                    y_mini = self.get_y_contour(df_mini)
+                if self.is_aug:
+                    x_mini , y_mini = self.get_x_masks_aug(x_mini , y_mini)
+                print("The mask :" ,check_masks(y_mini))
+                if check_masks(y_mini) ==False:
+                    y_mini = segs_to_masks(np.argmax(y_mini , 3))
+                print("The mask :" ,check_masks(y_mini))
                 return x_mini , y_mini
-            elif self.state =='contour':
-                y_mini = self.get_y_contour(df_mini)
-                return x_mini , y_mini
+
         else:
             return x_mini
 
@@ -198,8 +263,9 @@ class plumage_data_input:
 
         return x_all.astype('uint8')
     
-    #Get patches in [batch, width, height, patches]
+   
     def get_y_patches(self, df):
+         #Get patches in [batch, width, height, patches]
         scale = self.scale
         cols = self.patches_cols
         
@@ -222,7 +288,9 @@ class plumage_data_input:
             output_map[row,label_row==0,0] =1        
         return output_map
 
+    
     def get_y_contour(self, df):
+        #Get the contour
         scale = self.scale
         cols = self.contour_col
         
@@ -391,7 +459,6 @@ class plumage_data_input:
 
 
 
-
     def get_x_df_aug(self ,df):
         folder = self.pre_path
         l_m_columns = self.coords_cols
@@ -540,3 +607,94 @@ class plumage_data_input:
             img_id+=1
             
         return x_all.astype('uint8'),df
+
+    def get_x_masks_aug(self,x ,masks):
+        # x [batch_size ,height, width, 3]
+        # mask [batch_size ,height, width, 3]
+        
+        df_size =  x.shape[0]
+        img_wid = x.shape[2]
+        img_hei =x.shape[1]
+        n_cl = masks[-1]
+        for idx in range(df_size):
+            img = x[idx,...]
+            mask = masks[idx,...]
+            
+            aug_prob = 1
+            if aug_prob > 0.5:
+                
+                #-----Translate----
+                if self.aug_option['trans']:
+                    min_offset = 0
+                    max_offset = 100
+                    trans_lr = choice([randint(min_offset,max_offset) , randint(-max_offset,-min_offset)] ) #left/right (i.e. 5/-5)
+
+                    trans_ud = choice([randint(min_offset,max_offset) , randint(-max_offset,-min_offset)] ) #up/down (i.e. 5/-5)
+
+
+                    M = np.float32([[1,0,trans_lr],[0,1,trans_ud]])
+
+                    img = cv2.warpAffine(img,M,(img_wid,img_hei))
+                    mask  = cv2.warpAffine(mask,M,(img_wid,img_hei))
+    #                 img = img.transform(img.size, Image.AFFINE, (1, 0, trans_lr, 0, 1, trans_ud))
+                
+
+                
+                
+                # ---------Rotate--------
+                if self.aug_option['rot']:
+                    angle_bound = 30
+                    angle = randint(-angle_bound,angle_bound)
+                    # angle =15
+                    radian = math.pi/180*angle
+
+                    M = cv2.getRotationMatrix2D((img_wid/2,img_hei/2),angle,1)
+                    img = cv2.warpAffine(img,M,(img_wid,img_hei))
+#                     img = img.rotate(angle)
+                    mask  = cv2.warpAffine(mask,M,(img_wid,img_hei))
+            
+                        ##-----Scale------
+                if self.aug_option['scale']:
+                    #scale value:
+                    scale_ratio = randint(5,15)/10
+                    print(scale_ratio )
+                    new_scaled_width = (int(img_wid *scale_ratio))
+                    new_scaled_height = (int(img_hei * scale_ratio))
+                    
+                    img = cv2.resize(img, dsize=(new_scaled_width,new_scaled_height),
+                                     interpolation=cv2.INTER_LINEAR)
+                    mask = cv2.resize(mask, dsize=(new_scaled_width,new_scaled_height),
+                                     interpolation=cv2.INTER_LINEAR)
+                    # shrinking and padding
+                    if scale_ratio<1:
+                        delta_w = img_wid - new_scaled_width
+                        delta_h = img_hei - new_scaled_height
+
+                        img= cv2.copyMakeBorder(img,delta_h//2,delta_h-(delta_h//2),
+                                                delta_w//2,delta_w-(delta_w//2),
+                                                cv2.BORDER_CONSTANT,value=[0,0,0])
+                        mask = np.pad(mask ,((delta_h//2,delta_h-(delta_h//2)) ,
+                                             (delta_w//2,delta_w-(delta_w//2)),
+                                             (0,0)),
+                                            'constant' , constant_values=0)
+#                         mask= cv2.copyMakeBorder(mask,delta_h//2,delta_h-(delta_h//2),
+#                                                 delta_w//2,delta_w-(delta_w//2),
+#                                                 cv2.BORDER_CONSTANT,value=[0]*n_cl)
+                    elif scale_ratio>1:
+                        delta_w =  new_scaled_width - img_wid
+                        delta_h =  new_scaled_height - img_hei
+                        img = img[delta_h//2:delta_h//2+img_hei ,  delta_w//2: delta_w//2+img_wid,:]
+                        mask = mask[delta_h//2:delta_h//2+img_hei ,  delta_w//2: delta_w//2+img_wid,:]
+        
+#         label_row = np.argmax(mask , axis=2)
+#         mask[label_row==0,0] =1  
+        
+        x[idx,...] = img
+        masks[idx,...] = mask
+ 
+        
+#                 folder = self.pre_path
+
+        return x, masks
+
+        
