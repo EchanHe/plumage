@@ -503,6 +503,8 @@ class HourglassModel():
     def get_heatmaps(self, load):
         with tf.name_scope('Session'):
             with tf.device(self.gpu):
+                # self._init_weight()
+                self._define_saver_summary()
                 if load is not None:
                     # print("Read check point file: "+load)
                     self.saver.restore(self.Session, load)
