@@ -167,10 +167,10 @@ class plumage_data_input:
                     y_mini = self.get_y_contour(df_mini)
                 if self.is_aug:
                     x_mini , y_mini = self.get_x_masks_aug(x_mini , y_mini)
-                print("The mask :" ,check_masks(y_mini))
+                # print("The mask :" ,check_masks(y_mini))
                 if check_masks(y_mini) ==False:
                     y_mini = segs_to_masks(np.argmax(y_mini , 3))
-                print("The mask :" ,check_masks(y_mini))
+                # print("The mask :" ,check_masks(y_mini))
                 return x_mini , y_mini
 
         else:
@@ -615,12 +615,12 @@ class plumage_data_input:
         df_size =  x.shape[0]
         img_wid = x.shape[2]
         img_hei =x.shape[1]
-        n_cl = masks[-1]
+        n_cl = masks.shape[-1]
         for idx in range(df_size):
-            img = x[idx,...]
-            mask = masks[idx,...]
+            img = x[idx,...].copy()
+            mask = masks[idx,...].copy()
             
-            aug_prob = 1
+            aug_prob = random()  
             if aug_prob > 0.5:
                 
                 #-----Translate----
@@ -637,13 +637,10 @@ class plumage_data_input:
                     img = cv2.warpAffine(img,M,(img_wid,img_hei))
                     mask  = cv2.warpAffine(mask,M,(img_wid,img_hei))
     #                 img = img.transform(img.size, Image.AFFINE, (1, 0, trans_lr, 0, 1, trans_ud))
-                
-
-                
-                
+                           
                 # ---------Rotate--------
                 if self.aug_option['rot']:
-                    angle_bound = 30
+                    angle_bound = 20
                     angle = randint(-angle_bound,angle_bound)
                     # angle =15
                     radian = math.pi/180*angle
@@ -657,7 +654,8 @@ class plumage_data_input:
                 if self.aug_option['scale']:
                     #scale value:
                     scale_ratio = randint(5,15)/10
-                    print(scale_ratio )
+#                     scale_ratio = 2.0
+#                     print(scale_ratio )
                     new_scaled_width = (int(img_wid *scale_ratio))
                     new_scaled_height = (int(img_hei * scale_ratio))
                     
@@ -686,11 +684,16 @@ class plumage_data_input:
                         img = img[delta_h//2:delta_h//2+img_hei ,  delta_w//2: delta_w//2+img_wid,:]
                         mask = mask[delta_h//2:delta_h//2+img_hei ,  delta_w//2: delta_w//2+img_wid,:]
         
-#         label_row = np.argmax(mask , axis=2)
+        seg = np.argmax(mask , axis=2)
+        _, n_cl_aug = extract_classes(seg )
+#         print(n_cl_aug , n_cl)
+        if n_cl_aug == n_cl:
+            x[idx,...] = img
+            masks[idx,...] = mask
+        
 #         mask[label_row==0,0] =1  
         
-        x[idx,...] = img
-        masks[idx,...] = mask
+
  
         
 #                 folder = self.pre_path
