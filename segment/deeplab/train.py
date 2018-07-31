@@ -60,6 +60,10 @@ if params['category'] is not None:
 elif params['category'] is None or params['category'] =='all':
     params['name'] +='_' + 'all'
 
+
+if params['data_state'] == 'contour':
+    # Use data entries have the poly contour 
+    df_train = df_train.loc[df_train['poly.outline'] !='-1' , :]
 # df_train = df_train[0:15]
 # df_valid = df_valid[0:15]
 

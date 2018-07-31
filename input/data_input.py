@@ -43,6 +43,7 @@ def segs_to_masks(segs):
 
     masks = np.zeros((segs.shape[0] , segs.shape[1] , segs.shape[2] , n_cl))
     for i in np.arange(df_size):
+        cl, n_cl = extract_classes(segs[i,...] )
         masks[i,...] = extract_masks(segs[i,...] , cl, n_cl)
 
     return masks
@@ -235,6 +236,25 @@ class plumage_data_input:
                 return x_mini , y_mini
         else:
             return x_mini
+   
+
+    def get_next_batch_no_random_all_labels(self):
+        batch_size = self.batch_size
+        df_size = self.df_size
+        is_train = self.is_train
+
+        
+        if self.start_idx >= (df_size - batch_size+1):
+            df_mini = self.df.iloc[self.start_idx : ]
+        else: 
+            df_mini = self.df.iloc[self.start_idx : self.start_idx+batch_size]
+        x_mini = self.get_x_img(df_mini)
+        coords_mini = self.get_y_coord(df_mini , self.scale , True)
+        p_coords_mini = self.get_contour_patches_coords(df_mini)
+        
+        self.start_idx += batch_size
+        return x_mini, coords_mini , p_coords_mini
+        
         
     ######get data#############
     
@@ -315,7 +335,26 @@ class plumage_data_input:
             label_row = np.argmax(output_map[row, ...],axis=2)
             output_map[row,label_row==0,0] =1  
         return output_map
-    
+    def get_contour_patches_coords(self, df):
+        #Get the contour
+        scale = self.scale
+        cols =self.contour_col + self.patches_cols
+        
+        patches = df[cols].as_matrix()
+
+        patches_coords = [0]* patches.shape[0]
+        for row in np.arange(patches.shape[0]):
+            patch_coords = []
+            for col in np.arange(patches.shape[1]):
+                patch = patches[row,col]
+                if patch is not np.nan and patch!="-1":
+                    patch_int = np.array([int(s) for s in patch.split(",")]) //scale
+                else:
+                    patch_int = np.array([-1])
+                patch_coords.append(patch_int)
+            patches_coords[row] = patch_coords
+        #             print(patch_int)
+        return patches_coords 
     def get_y_coord(self ,df,scale = 1,coord_only = False):
         """
         返回[m,2*landmark]的关键点坐标数组
@@ -324,7 +363,7 @@ class plumage_data_input:
         cols_num_per_coord = self.cols_num_per_coord
 
         y_coord = df[l_m_columns].as_matrix()
-        return y_coord
+        return y_coord//scale
 
         y_coord[:,np.arange(0,y_coord.shape[1],3)] = y_coord[:,np.arange(0,y_coord.shape[1],3)]/scale
         y_coord[:,np.arange(1,y_coord.shape[1],3)] = y_coord[:,np.arange(1,y_coord.shape[1],3)]/scale
@@ -620,7 +659,7 @@ class plumage_data_input:
             img = x[idx,...].copy()
             mask = masks[idx,...].copy()
             
-            aug_prob = random()  
+            aug_prob =  random()  
             if aug_prob > 0.5:
                 
                 #-----Translate----
@@ -684,12 +723,11 @@ class plumage_data_input:
                         img = img[delta_h//2:delta_h//2+img_hei ,  delta_w//2: delta_w//2+img_wid,:]
                         mask = mask[delta_h//2:delta_h//2+img_hei ,  delta_w//2: delta_w//2+img_wid,:]
         
-        seg = np.argmax(mask , axis=2)
-        _, n_cl_aug = extract_classes(seg )
-#         print(n_cl_aug , n_cl)
-        if n_cl_aug == n_cl:
-            x[idx,...] = img
-            masks[idx,...] = mask
+            seg = np.argmax(mask , axis=2)
+            cl_aug, n_cl_aug = extract_classes(seg )
+            if n_cl_aug == n_cl:
+                x[idx,...] = img
+                masks[idx,...] = mask
         
 #         mask[label_row==0,0] =1  
         
