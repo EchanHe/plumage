@@ -11,7 +11,6 @@ from hourglass_tiny import HourglassModel
 import os
 import pandas as pd
 import sys
-import plumage_util
 # import hg_data_input
 dirname = os.path.dirname(__file__)
 input_lib_dir= os.path.abspath(os.path.join(dirname,"../input"))
@@ -20,7 +19,8 @@ sys.path.append(input_lib_dir)
 sys.path.append(util_lib_dir)
 import data_input
 from plumage_config import process_config , save_config
-
+from points_io import write_point_result
+from points_util import heatmap_to_coord
 
 
 print('--Parsing Config File')
@@ -80,6 +80,6 @@ gt_coords = valid_data.df[valid_data.coords_cols].as_matrix()
 lm_cnt = valid_data.lm_cnt
 
 
-pred_coord = plumage_util.heatmap_to_coord(heatmaps , valid_data.img_width , valid_data.img_height)
+pred_coord = heatmap_to_coord(heatmaps , valid_data.img_width , valid_data.img_height)
 
-plumage_util.write_point_result(pred_coord , gt_coords ,lm_cnt , params , params['valid_result_dir'])
+write_point_result(pred_coord , gt_coords ,lm_cnt , params , params['valid_result_dir'])

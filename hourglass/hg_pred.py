@@ -24,7 +24,7 @@ from points_metrics import pck_accuracy
 from points_util import heatmap_to_coord,pred_coords_to_patches
 
 print('--Parsing Config File')
-params = process_config('config_valid.cfg')
+params = process_config('config_pred.cfg')
 
 
 rootdir = params['work_dir']
@@ -36,9 +36,9 @@ if params['category'] is not None:
     params['name'] +='_' + params['category']
     df_valid = df_valid.loc[df_valid.view==params["category"],:].reset_index(drop = True)
 # df_valid = df_valid[:10]
-print("Read valid set data: ...")
+print("Read valid set data: ...", img_path)
 valid_data = data_input.plumage_data_input(df_valid,params['batch_size'],scale = params['scale'], state = params['data_state'],
-                                         is_train=True , pre_path = img_path,is_aug=params['img_aug'] )
+                                         is_train=False , pre_path = img_path,is_aug=params['img_aug'] )
 
 #Get the name of the checkpoints:
 names = os.listdir(params['saver_directory'])
@@ -73,26 +73,9 @@ print("Load model from:",load_file)
 heatmaps = model.get_heatmaps(load = load_file)
 print("Output heatmaps result. Shape: "+ str(heatmaps.shape))
 
-
-
-gt_coords = valid_data.df[valid_data.coords_cols].as_matrix()
-
-
-
 pred_coord = heatmap_to_coord(heatmaps , valid_data.img_width , valid_data.img_height)
 patch_coord = pred_coords_to_patches(pred_coord)
 
-write_coord(pred_coord , gt_coords,params['valid_result_dir'])
+# write_coord(pred_coord , gt_coords,params['valid_result_dir'])
 write_pred_dataframe(valid_data , pred_coord , params['valid_result_dir'], params['name'] , patch_coord )
 
-# result = pd.DataFrame(pred_coord ,index =df_file_names, columns = valid_data.coords_cols )
-# if not os.path.exists(params['valid_result_dir']):
-#     os.makedirs(params['valid_result_dir'])
-
-# result.to_csv(params['valid_result_dir']+params['name']+".csv")
-
-lm_cnt = valid_data.lm_cnt
-scaled_diff_per_pt ,scaled_pck= pck_accuracy(pred_coord , gt_coords, lm_cnt=lm_cnt , pck_threshold = params['pck_threshold'],scale = 20)
-diff_per_pt ,pck= pck_accuracy(pred_coord , gt_coords, lm_cnt=lm_cnt , pck_threshold = params['pck_threshold'],scale = 1)
-print("scaled diff per points\n{}\nscaled pck_{}\n{}".format(scaled_diff_per_pt ,params['pck_threshold'],scaled_pck ))
-print("diff per points\n{}\npck_{}\n{}".format(diff_per_pt ,params['pck_threshold'],pck ))

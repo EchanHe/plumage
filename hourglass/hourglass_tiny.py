@@ -503,14 +503,17 @@ class HourglassModel():
     def get_heatmaps(self, load):
         with tf.name_scope('Session'):
             with tf.device(self.gpu):
-                # self._init_weight()
+                self._init_weight()
                 self._define_saver_summary()
                 if load is not None:
                     # print("Read check point file: "+load)
                     self.saver.restore(self.Session, load)
                 heatmap_all= np.ones((self.data_stream_valid.df_size ,self.output_height,self.output_width,self.outDim )) *-1
                 for i_df_valid in np.arange(0,self.data_stream_valid.df_size,self.batchSize):
-                    X_valid_mini,_,coords_mini,_ = self.data_stream_valid.get_next_batch_no_random()
+                    if self.training:
+                        X_valid_mini,_,coords_mini,_ = self.data_stream_valid.get_next_batch_no_random()
+                    else:
+                        X_valid_mini = self.data_stream_valid.get_next_batch_no_random()
                     result = self.Session.run(self.output, feed_dict =  {self.img : X_valid_mini})
                     heatmap_all[i_df_valid:i_df_valid+self.batchSize,...] = result[:,self.nStack-1,:,:,:]
 
