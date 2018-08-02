@@ -38,6 +38,8 @@ no_side_cols = ['crown_x', 'crown_y', 'nape_x',
 patches_cols = ['poly.crown', 'poly.nape','poly.mantle', 'poly.rump', 'poly.tail',
      'poly.throat', 'poly.breast', 'poly.belly', 'poly.tail.underside',
      'poly.wing.coverts',   'poly.wing.primaries.secondaries']
+
+     
 ### Goal: write prediction coordinates to DATAFRAME csv
 # Params: gt_df: dataframe of ground truth. 
 # Params: pred_coord [batch , lm_cnt * 2 ].

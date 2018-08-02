@@ -23,10 +23,10 @@ def pred_coords_to_patches(pred_coords , half_width =100, half_height=25 , total
     x_coords = pred_coords[:,range(0,total_patches*2,2)]
     y_coords = pred_coords[:,range(1,total_patches*2,2)]
 
-    upper_x_coords = x_coords + half_height
+    upper_x_coords = x_coords + half_width
     upper_y_coords = y_coords + half_height
     lower_x_coords = x_coords - half_width
-    lower_y_coords = y_coords - half_width
+    lower_y_coords = y_coords - half_height
 
 
     print(x_coords.shape, y_coords.shape)

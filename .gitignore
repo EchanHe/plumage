@@ -1,3 +1,4 @@
+*.cfg
 *ipynb
 *.zip
 params
@@ -5,3 +6,5 @@ log
 result
 result_visualization
 __pycache__
+expert_data
+test_data

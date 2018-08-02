@@ -28,7 +28,7 @@ sys.path.append(input_lib_dir)
 sys.path.append(util_lib_dir)
 import data_input
 from plumage_config import process_config , save_config
-import plumage_util
+from seg_io import write_seg_result
 
 
 print('--Parsing Config File')
@@ -190,4 +190,4 @@ with tf.Session() as sess:
             model.save(sess, saver, save_filename,epochs)
 
 
-plumage_util.write_seg_result(mean_miou, params , params['result_dir'] ,cor_pred = mean_cor_pred)
+write_seg_result(mean_miou, params , params['result_dir'] ,cor_pred = mean_cor_pred)
