@@ -40,38 +40,32 @@ model = network.Network(params)
 predict = model.deeplab_v3()
 
 
-
 valid_csv = pd.read_csv(params['valid_file'])
 # valid_csv = valid_csv[:100]
 valid_data = data_input.plumage_data_input(valid_csv,
-                                           batch_size=params['batch_size'],is_train =False,
+                                           batch_size=params['batch_size'],is_train =params['is_train'],
                            pre_path =params['img_folder'],state=params['data_state'],
                            scale=params['scale'] ,is_aug = params['img_aug'])
 
-
-
 param_dir = params['saver_directory']
 logdir = params['log_dir']
-restore_file = "/home/yichenhe/plumage/params/contour/2018-07-31_deep_lab_v3_all-20"
+restore_file = params['restore_param_file'] #"/home/yichenhe/plumage/params/contour/2018-07-31_deep_lab_v3_all-20"
 initialize = params['init']
-
 saver = tf.train.Saver()
 init_op = tf.global_variables_initializer()
 import time
 start_time = time.time()
 with tf.Session() as sess:
-    if not os.path.exists(param_dir):
-        os.makedirs(param_dir)
-    if os.listdir(param_dir) == [] or initialize:
+    if initialize:
         print ("Initializing Network")
         sess.run(init_op)
     else:
+        assert os.path.exists(restore_file + ".index") , "Ckpt file is wrong, please check the config file!"
+        print("Read checkpoint from: ".format(restore_file))
         sess.run(init_op)
         saver.restore(sess, restore_file)
-#         model.restore(sess, saver, restore_file)
-    sess.run(tf.local_variables_initializer())
-    # Validation阶段 
-    # 输出Validation set的准确率
+
+    # Validation step
     miou_list = np.array([])
     cor_pred_list =np.array([])
     for i_df_valid in np.arange(0,valid_csv.shape[0],params["batch_size"]):
@@ -85,9 +79,7 @@ with tf.Session() as sess:
         ##save the result visualization
        
         
-        #### END
-        
-        
+        #### END     
         if i_df_valid == 0:
             result_valid = result_mini
             x_valid_all = x
