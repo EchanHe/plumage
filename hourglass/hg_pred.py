@@ -69,13 +69,19 @@ model = HourglassModel(img_width = params['img_width'],img_height=params['img_he
                        logdir_train=params['log_dir_train'], logdir_test=params['log_dir_test'],saver_directory=params['saver_directory'],
                        tiny= params['tiny'], w_loss=params['weighted_loss'],w_summary=True , joints= params['joint_list'],modif=False)
 model.generate_model()
+import time
+start_time = time.time()
+
+
 print("Load model from:",load_file)
 heatmaps = model.get_heatmaps(load = load_file)
 print("Output heatmaps result. Shape: "+ str(heatmaps.shape))
-
+print("Heat map--- {} mins ---".format((time.time() - start_time)/60))
+start_time = time.time()
 pred_coord = heatmap_to_coord(heatmaps , valid_data.img_width , valid_data.img_height)
 patch_coord = pred_coords_to_patches(pred_coord)
 
 # write_coord(pred_coord , gt_coords,params['valid_result_dir'])
+params['name'] = params['name']+params['valid_file'].split('/')[-1]
 write_pred_dataframe(valid_data , pred_coord , params['valid_result_dir'], params['name'] , patch_coord )
-
+print("Write result--- {} mins ---".format((time.time() - start_time)/60))
