@@ -67,6 +67,8 @@ def save_masks_on_image(images, pred_segs, save_path, fig_names=None):
         fig.savefig(save_path+"seg_{}.jpg".format(i_start))
         # fig.savefig("/home/yichenhe/plumage/result_visualization/segment_contour/" + "image_and_mask{}.jpg".format(i_start))
         plt.close(fig)
+
+
 inter_color_list = [np.array([255,0,0]),
                     np.array([0,255,0]),
                     np.array([0,0,255]) ]
@@ -177,7 +179,7 @@ def save_masks(gt_segs, pred_segs, save_path, fig_names=None):
 LM_CNT = 5
 
 def show_markups(imgs , pred_coords = None , pred_patches =None , pred_contours=None,
-    gt_coords =None , gt_patches=None, gt_contours=None, save_path = None , fig_names = None):
+    gt_coords =None , gt_patches=None, gt_contours=None, pck_threshold = None, save_path = None , fig_names = None):
     """
     Plot the markups and images
     
@@ -211,7 +213,7 @@ def show_markups(imgs , pred_coords = None , pred_patches =None , pred_contours=
             pred_coord = _none_or_element(pred_coords ,i_row) , pred_patch =_none_or_element(pred_patches ,i_row),
             pred_contour = _none_or_element(pred_contours ,i_row),
             gt_coord = _none_or_element(gt_coords ,i_row), gt_patch =   _none_or_element(gt_patches ,i_row),
-            gt_contour = _none_or_element(gt_contours ,i_row),
+            gt_contour = _none_or_element(gt_contours ,i_row),pck_threshold = pck_threshold,
             fig_name = _none_or_element(fig_names ,i_row))
 
         if save_path is not None:
@@ -220,7 +222,7 @@ def show_markups(imgs , pred_coords = None , pred_patches =None , pred_contours=
 
 
 def show_one_markup(plt, img, pred_coord , pred_patch , pred_contour,
-    gt_coord  , gt_patch, gt_contour, fig_name = ""):
+    gt_coord  , gt_patch, gt_contour,pck_threshold, fig_name = ""):
     """
     Plot one image and markup using show_coords and show_patches
 
@@ -242,11 +244,11 @@ def show_one_markup(plt, img, pred_coord , pred_patch , pred_contour,
 
     show_patches(plt, gt_patch, 'red')
     show_patches(plt, gt_contour , 'red', is_patch = False)
-    show_coords(plt, gt_coord, 'red')
+    show_coords(plt, gt_coord, pck_threshold, 'red')
 
 
 
-def show_coords(plt, coord , color = 'cyan'):
+def show_coords(plt, coord ,pck_threshold = None, color = 'cyan'):
     """
     Plot the 2D points on figure
 
@@ -261,8 +263,12 @@ def show_coords(plt, coord , color = 'cyan'):
         return 0
     lm_cnt = LM_CNT
     cols_num_per_coord = 2
-    # lm_cnt = 5
-
+    if pck_threshold is not None:
+        x = coord[0]
+        y = coord[1] 
+        plt.plot([x,x], [y,y+pck_threshold],color = 'white' , linewidth = 2.0)
+        # plt.text(x* (1.01) , y * (1.01)  , str(pck_threshold)+" pixels", 
+        #                      fontsize=10 , bbox=dict(facecolor='white', alpha=0.4))
     for i_col in range(lm_cnt):
         x = coord[ i_col * cols_num_per_coord]
         y = coord[ i_col * cols_num_per_coord +1] 

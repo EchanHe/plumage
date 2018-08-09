@@ -62,6 +62,7 @@ def write_pred_dataframe(valid_data , pred_coord , folder,file_name , patches_co
     result.loc[result['view']=='side', no_side_cols]=-1
 
     result.to_csv(folder+file_name+".csv" , index =False)
+    return result
 
 ### Goal: write the evaluation on json
 # Params: gt_df: dataframe of ground truth. pred_coords [batch , lm_cnt * 2 ].

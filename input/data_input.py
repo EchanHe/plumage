@@ -1,8 +1,6 @@
 """
-按不同类型读图片，
-并生成为：
-x (m, 宽*高*3)
-y (m,关键点*3)
+Data input class
+generate image and labels
 """
 
 import numpy as np
@@ -36,14 +34,13 @@ def check_mask(mask):
     return  sum_pixel == (img_wid*img_hei)
 
 # Change 
-def segs_to_masks(segs):
+def segs_to_masks(segs , n_cl):
     assert len(segs.shape) ==3 , "Make sure input is [batch_size , height, width]"
     df_size = segs.shape[0]
-    cl, n_cl = extract_classes(segs[0,...] )
 
     masks = np.zeros((segs.shape[0] , segs.shape[1] , segs.shape[2] , n_cl))
     for i in np.arange(df_size):
-        cl, n_cl = extract_classes(segs[i,...] )
+        cl, _ = extract_classes(segs[i,...] )
         masks[i,...] = extract_masks(segs[i,...] , cl, n_cl)
 
     return masks
@@ -73,15 +70,13 @@ def segm_size(segm):
 # Data class
 class plumage_data_input:
     """
-    读数据的类。
-    一次读入所有图片的索引表
-    然后随机或者按顺序返回batch大小的数据
+    Class that read a dataframe
     """
     file_name_col = 'file.vis'
     file_info_cols = ['file.vis', 'file.uv', 'view' , 'img.missing']
-    bounding_cols = ['outline.bb' , 'poly.outline']
-    patches_cols = ['poly.crown', 'poly.nape','poly.mantle', 'poly.rump', 'poly.tail'
-    , 'poly.wing.coverts',   'poly.wing.primaries.secondaries',
+
+    patches_cols = ['poly.crown' , 'poly.nape','poly.mantle', 'poly.rump', 'poly.tail',
+    'poly.wing.coverts',   'poly.wing.primaries.secondaries',
      'poly.throat', 'poly.breast', 'poly.belly', 'poly.tail.underside']
     coords_cols = ['s02.standard_x', 's02.standard_y', 's20.standard_x', 's20.standard_y',
        's40.standard_x', 's40.standard_y', 's80.standard_x', 's80.standard_y',
@@ -96,16 +91,31 @@ class plumage_data_input:
     lm_cnt = int(len(coords_cols) /  cols_num_per_coord)
     
     aug_option = {'trans' :True , 'rot' :True , 'scale' :True}
+    STATE_OPTIONS = ['coords', 'contour', 'patches']
     def __init__(self,df,batch_size,is_train,pre_path, state,scale=1 ,is_aug = True):
+        """
+        init function for the data
+        
+        params:
+            df: a dataframe with image names and markups(training and validation set)
+            batch_size: size of a batch
+            is_train: The input data in training or not? False means only read image names
+            pre_path: The image folder
+            State: The labels to read with giving state
+            scale: The scale for downsampling the images
+            is_aug: Whether augment the data
+            
+        """
 
-        self.df  =df# "train_pad/Annotations/train_"+categories.get_cate_name(cates)+"_coord.csv"
+        self.df  = df
         self.pre_path = pre_path
         self.scale = scale
-        # self.X = X
         self.df_size = df.shape[0]
         self.batch_size = batch_size
         self.is_train = is_train
         self.is_aug = is_aug
+        
+        assert state in self.STATE_OPTIONS, "State is not in {}".format(self.STATE_OPTIONS)
         self.state = state
 
         self.start_idx =0
@@ -113,15 +123,24 @@ class plumage_data_input:
         np.random.shuffle(self.indices)
 
         filepath_test = pre_path+df.iloc[0,0]
-        img = Image.open(filepath_test)
-        self.img_width= img.size[0]
-        self.img_height = img.size[1]
+        img = cv2.imread(filepath_test)
+#         img = Image.open(filepath_test)
+        self.img_width= img.shape[1]
+        self.img_height = img.shape[0]
 
         print("Init data class...")
         print("\tData shape: {}\n\tbatch_size:{}\n\tImage resolution: {}*{}\n\tImage Augmentation:{}"\
             .format(self.df_size, self.batch_size ,self.img_width , self.img_height, self.is_aug))
         print("Augmentation option:" , self.aug_option)
         
+        self.all_columns = df.columns
+        
+        if self.state =='coords':
+            self.output_channel = int(len(self.coords_cols) /  self.cols_num_per_coord)
+        elif self.state =='patches':
+            self.output_channel = len(self.patches_cols) + 1
+        elif self.state =='contour':
+            self.output_channel = len(self.contour_col) + 1
         
         
         
@@ -131,8 +150,7 @@ class plumage_data_input:
         batch_size = self.batch_size
         df_size = self.df_size
         is_train = self.is_train
-
-        
+    
         if self.start_idx >= (df_size - batch_size+1):
             self.start_idx = 0 
             self.indices = np.arange(self.df_size)
@@ -148,7 +166,7 @@ class plumage_data_input:
             
         # print(df_mini)
         if is_train:
-            # print(df_mini)
+            # Return a batch of coords
             if self.state =='coords':
                 if self.is_aug:
                     x_mini, df_mini = self.get_x_df_aug(df_mini)
@@ -170,7 +188,7 @@ class plumage_data_input:
                     x_mini , y_mini = self.get_x_masks_aug(x_mini , y_mini)
                 # print("The mask :" ,check_masks(y_mini))
                 if check_masks(y_mini) ==False:
-                    y_mini = segs_to_masks(np.argmax(y_mini , 3))
+                    y_mini = segs_to_masks(np.argmax(y_mini , 3) , self.output_channel)
                 # print("The mask :" ,check_masks(y_mini))
                 return x_mini , y_mini
 
@@ -250,10 +268,10 @@ class plumage_data_input:
             df_mini = self.df.iloc[self.start_idx : self.start_idx+batch_size]
         x_mini = self.get_x_img(df_mini)
         coords_mini = self.get_y_coord(df_mini , self.scale , True)
-        p_coords_mini = self.get_contour_patches_coords(df_mini)
-        
+        p_coords_mini = self.get_contour_patches_coords(df_mini , mode = 'patches' )
+        c_coords_mini = self.get_contour_patches_coords(df_mini , mode = 'contour')
         self.start_idx += batch_size
-        return x_mini, coords_mini , p_coords_mini
+        return x_mini, coords_mini , p_coords_mini, c_coords_mini
         
         
     ######get data#############
@@ -299,13 +317,13 @@ class plumage_data_input:
             for col in np.arange(patches.shape[1]):
                 patch = patches[row,col]
                 mask = np.zeros((height, width))
-                if patch is not np.nan and patch!="-1":
+                if patch is not np.nan and patch!="-1" and patch !=-1:
                     patch_int = np.array([int(s) for s in patch.split(",")])
                     coords = np.reshape((patch_int/scale).astype(int).tolist(), (-1, 2))
                     cv2.fillConvexPoly(mask, coords , 1)
                     output_map[row, :,:,col+1] = mask
             label_row = np.argmax(output_map[row, ...],axis=2)
-            output_map[row,label_row==0,0] =1        
+            output_map[row,label_row==0,0] =1      
         return output_map
 
     
@@ -325,7 +343,7 @@ class plumage_data_input:
 #                 img = Image.new('1', (width, height), 0)
                 mask = np.zeros((height, width))
                 patch = patches[row,col]
-                if patch is not np.nan and patch!="-1":
+                if patch is not np.nan and patch!="-1" and patch !=-1:
                     patch_int = np.array([int(s) for s in patch.split(",")])
     
                     coords = np.reshape((patch_int/scale).astype(int).tolist(), (-1, 2))
@@ -335,24 +353,33 @@ class plumage_data_input:
             label_row = np.argmax(output_map[row, ...],axis=2)
             output_map[row,label_row==0,0] =1  
         return output_map
-    def get_contour_patches_coords(self, df):
+    def get_contour_patches_coords(self, df ,mode):
         #Get the contour
         scale = self.scale
-        cols =self.contour_col + self.patches_cols
-        
-        patches = df[cols].as_matrix()
+        patches_coords = None
 
-        patches_coords = [0]* patches.shape[0]
-        for row in np.arange(patches.shape[0]):
-            patch_coords = []
-            for col in np.arange(patches.shape[1]):
-                patch = patches[row,col]
-                if patch is not np.nan and patch!="-1":
-                    patch_int = np.array([int(s) for s in patch.split(",")]) //scale
-                else:
-                    patch_int = np.array([-1])
-                patch_coords.append(patch_int)
-            patches_coords[row] = patch_coords
+        if mode == "patches":
+            cols = self.patches_cols 
+        elif mode == "contour":
+            cols = self.contour_col
+        else:
+            return None 
+
+        if _check_exist_cols(cols , self.all_columns):
+            
+            patches = df[cols].as_matrix()
+
+            patches_coords = [0]* patches.shape[0]
+            for row in np.arange(patches.shape[0]):
+                patch_coords = []
+                for col in np.arange(patches.shape[1]):
+                    patch = patches[row,col]
+                    if patch is not np.nan and patch!="-1" and patch !=-1:
+                        patch_int = np.array([int(s) for s in patch.split(",")]) //scale
+                    else:
+                        patch_int = np.array([-1])
+                    patch_coords.append(patch_int)
+                patches_coords[row] = patch_coords
         #             print(patch_int)
         return patches_coords 
     def get_y_coord(self ,df,scale = 1,coord_only = False):
@@ -729,13 +756,18 @@ class plumage_data_input:
                 x[idx,...] = img
                 masks[idx,...] = mask
         
-#         mask[label_row==0,0] =1  
-        
-
- 
-        
-#                 folder = self.pre_path
-
         return x, masks
 
-        
+
+def _check_exist_cols(cols , total_cols):
+    return set(cols).issubset(set(total_cols))
+
+'''
+Exceptions
+'''
+class DataInputErr(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)

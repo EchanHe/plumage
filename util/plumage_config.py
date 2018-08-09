@@ -8,6 +8,7 @@ def process_config(conf_file):
     params = {}
     config = configparser.ConfigParser()
     config._interpolation = configparser.ExtendedInterpolation()
+    print('Read config file : ' , conf_file)
     config.read(conf_file)
     for section in config.sections():
         if section == 'Directory':
