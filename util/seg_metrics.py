@@ -9,7 +9,7 @@ import numpy as np
 from seg_util import *
 
 
-def segs_eval(pred_segms , gt_segms , mode="pixel_acc"):
+def segs_eval(pred_segms , gt_segms , mode="pixel_acc" , background = 0):
     """
     Average metrics of a batch of predict and ground truth segmentation with given mode.
 
@@ -22,7 +22,6 @@ def segs_eval(pred_segms , gt_segms , mode="pixel_acc"):
     df_size = pred_segms.shape[0]
     sum_acc=0
     if mode== "pixel_acc":
-
         for i in np.arange(df_size):
             sum_acc+=pixel_accuracy(pred_segms[i,...],gt_segms[i,...])
     elif mode =="miou":
@@ -33,12 +32,12 @@ def segs_eval(pred_segms , gt_segms , mode="pixel_acc"):
             sum_acc+= mean_accuracy(pred_segms[i,...],gt_segms[i,...])
     elif mode =="correct_pred":
         for i in np.arange(df_size):
-            sum_acc+= correct_pred(pred_segms[i,...],gt_segms[i,...])
+            sum_acc+= correct_pred(pred_segms[i,...],gt_segms[i,...] ,background)
 
 
     return round(sum_acc/df_size , 4)
 
-def correct_pred(eval_segm, gt_segm):
+def correct_pred(eval_segm, gt_segm, background):
     '''
     i>=1
     sum_i(n_ii) / sum_i(pred_i_i)

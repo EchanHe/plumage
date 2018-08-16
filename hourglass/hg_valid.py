@@ -9,6 +9,7 @@ from hourglass_tiny import HourglassModel
 
 import os
 import pandas as pd
+import numpy as np
 
 import sys
 #Add path of other folder and import files
@@ -21,6 +22,7 @@ import data_input
 from plumage_config import process_config
 from points_io import  write_pred_dataframe , write_coord
 from points_metrics import pck_accuracy
+from seg_metrics import segs_eval
 from points_util import heatmap_to_coord,pred_coords_to_patches
 from visualize_lib import show_markups
 
@@ -42,10 +44,10 @@ df_valid = pd.read_csv(params['valid_file'])
 
 
 print("Read valid set data: ...")
-valid_data = data_input.plumage_data_input(df_valid,params['batch_size'],scale = 1, state = params['data_state'],
+valid_data = data_input.plumage_data_input(df_valid,params['batch_size'],scale = 10, state = params['data_state'],
                                          is_train=True , pre_path = img_path,is_aug=params['img_aug'] )
 
-if params['pred_file'] is None:
+if params['pred_file'] == 'None':
     #Get the name of the checkpoints:
     names = os.listdir(params['saver_directory'])
     if params['category'] is not None:
@@ -97,10 +99,32 @@ else:
     gt_coords = valid_data.df[valid_data.coords_cols].as_matrix()
     lm_cnt = valid_data.lm_cnt
 
+    #print the accuracy
+    diff_per_pt ,pck= pck_accuracy(pred_coord , gt_coords, lm_cnt=lm_cnt , pck_threshold = params['pck_threshold'],scale = 1)
+    print("diff per points\n{}\npck_{}\n{}".format(diff_per_pt ,params['pck_threshold'],pck ))
 
-#print the accuracy
-diff_per_pt ,pck= pck_accuracy(pred_coord , gt_coords, lm_cnt=lm_cnt , pck_threshold = params['pck_threshold'],scale = 1)
-print("diff per points\n{}\npck_{}\n{}".format(diff_per_pt ,params['pck_threshold'],pck ))
+
+valid_data = data_input.plumage_data_input(df_valid, df_valid.shape[0] ,scale = 10, state = 'patches',
+                                     is_train=True , pre_path = img_path,is_aug=params['img_aug'] )
+
+pred_data = data_input.plumage_data_input(df_pred, df_valid.shape[0] ,scale = 10, state = 'patches',
+                                     is_train=True , pre_path = img_path,is_aug=params['img_aug'] )
+
+_, gt_mask = valid_data.get_next_batch_no_random()
+_,pred_mask = pred_data.get_next_batch_no_random()
+gt_segms = np.argmax(gt_mask, -1)
+pred_segms = np.argmax(pred_mask, -1)
+print("miou", segs_eval(pred_segms , gt_segms , mode="miou"))
+print("correct_pred", segs_eval(pred_segms , gt_segms , mode="correct_pred" , background = None))
+
+# for i in range(pred_mask.shape[3]):
+#     gt_seg = gt_mask[...,i]
+#     pred_seg = pred_mask[...,i]
+
+#     print("{} th patch".format(i))
+#     print("miou", segs_eval(pred_seg , gt_seg , mode="miou"))
+#     print("correct_pred", segs_eval(pred_seg , gt_seg , mode="correct_pred" , background = None))
+
 #Save images codes
 if params['save_img']:
     valid_data = data_input.plumage_data_input(df_valid, 10 ,scale = 1, state = params['data_state'],

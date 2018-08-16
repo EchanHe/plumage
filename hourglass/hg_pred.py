@@ -49,15 +49,6 @@ else:
 
 load_file = os.path.commonprefix(load_files).split('.')[0]
 load_file = os.path.join(params['saver_directory'] , load_file)
-#testfile
-if params['test_file'] is not None:
-    pred_file = os.path.join(rootdir , params['test_file'])
-    img_path = os.path.join(rootdir ,params['test_img_folder'])
-    df_test = pd.read_csv(pred_file)
-    # df_valid = df_valid[:1]
-    print("Read test set data: ...")
-    test_data = hg_data_input.hg_data_input(df_test,params['batch_size'],scale = params['scale'],
-                                             is_train=False , pre_path = img_path,is_aug=params['img_aug'] )
 
 
 model = HourglassModel(img_width = params['img_width'],img_height=params['img_height'] ,img_scale = params['scale'],

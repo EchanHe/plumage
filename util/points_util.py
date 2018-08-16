@@ -17,7 +17,7 @@ def heatmap_to_coord(heatmaps , ori_width , ori_height):
 # Goals: transfer the coords into a rectangle coords
 
 #return a matrix of rectangle x,y strings in [batch, n_patches]
-def pred_coords_to_patches(pred_coords , half_width =100, half_height=25 , total_patches =11 , ignore_coords =10):
+def pred_coords_to_patches(pred_coords , half_width =10, half_height=10 , total_patches =11 , ignore_coords =10):
 
     pred_coords = pred_coords[:,ignore_coords:]
     x_coords = pred_coords[:,range(0,total_patches*2,2)]

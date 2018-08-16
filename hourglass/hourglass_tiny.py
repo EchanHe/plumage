@@ -510,7 +510,7 @@ class HourglassModel():
                     self.saver.restore(self.Session, load)
                 heatmap_all= np.ones((self.data_stream_valid.df_size ,self.output_height,self.output_width,self.outDim )) *-1
                 for i_df_valid in np.arange(0,self.data_stream_valid.df_size,self.batchSize):
-                    if self.training:
+                    if self.data_stream_valid.is_train:
                         X_valid_mini,_,coords_mini,_ = self.data_stream_valid.get_next_batch_no_random()
                     else:
                         X_valid_mini = self.data_stream_valid.get_next_batch_no_random()

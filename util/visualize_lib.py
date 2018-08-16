@@ -273,7 +273,7 @@ def show_coords(plt, coord ,pck_threshold = None, color = 'cyan'):
         x = coord[ i_col * cols_num_per_coord]
         y = coord[ i_col * cols_num_per_coord +1] 
         if x >= 0 and ~np.isnan(x):
-            plt.plot(x, y, 'x' , alpha=0.8 , mew = 4 , mec = color )
+            plt.plot(x, y, 'x' , alpha=0.8 , mew = 3 , mec = color )
 
 patches_names = [ 'poly.crown', 'poly.nape','poly.mantle', 'poly.rump', 'poly.tail'
 , 'poly.wing.coverts',   'poly.wing.primaries.secondaries',
