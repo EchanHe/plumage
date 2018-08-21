@@ -21,7 +21,7 @@ sys.path.append(util_lib_dir)
 import data_input
 from plumage_config import process_config
 from points_io import  write_pred_dataframe , write_coord
-from points_metrics import pck_accuracy
+from points_metrics import *
 from seg_metrics import segs_eval
 from points_util import heatmap_to_coord,pred_coords_to_patches
 from visualize_lib import show_markups
@@ -72,22 +72,13 @@ if params['pred_file'] == 'None':
     print("Output heatmaps result. Shape: "+ str(heatmaps.shape))
 
 
-
     gt_coords = valid_data.df[valid_data.coords_cols].as_matrix()
-
-
-
     pred_coord = heatmap_to_coord(heatmaps , valid_data.img_width , valid_data.img_height)
+    
     patch_coord = pred_coords_to_patches(pred_coord)
 
-    write_coord(pred_coord , gt_coords,params['valid_result_dir'])
+    # write_coord(pred_coord , gt_coords,params['valid_result_dir'])
     df_pred = write_pred_dataframe(valid_data , pred_coord , params['valid_result_dir'], params['name'] , patch_coord )
-
-    lm_cnt = valid_data.lm_cnt
-
-    diff_per_pt ,pck= pck_accuracy(pred_coord , gt_coords, lm_cnt=lm_cnt , pck_threshold = params['pck_threshold'],scale = 1)
-
-    print("diff per points\n{}\npck_{}\n{}".format(diff_per_pt ,params['pck_threshold'],pck ))
 
     #Scaled version
     # scaled_diff_per_pt ,scaled_pck= pck_accuracy(pred_coord , gt_coords, lm_cnt=lm_cnt , pck_threshold = params['pck_threshold'],scale = 20)
@@ -97,33 +88,63 @@ else:
     pred_coord = df_pred[valid_data.coords_cols].as_matrix()
 
     gt_coords = valid_data.df[valid_data.coords_cols].as_matrix()
-    lm_cnt = valid_data.lm_cnt
 
-    #print the accuracy
-    diff_per_pt ,pck= pck_accuracy(pred_coord , gt_coords, lm_cnt=lm_cnt , pck_threshold = params['pck_threshold'],scale = 1)
-    print("diff per points\n{}\npck_{}\n{}".format(diff_per_pt ,params['pck_threshold'],pck ))
 
+lm_cnt = valid_data.lm_cnt
+
+#PCK accuracy:
+diff_per_pt ,pck= pck_accuracy(pred_coord , gt_coords, lm_cnt=lm_cnt , pck_threshold = params['pck_threshold'],scale = 1)
+print("diff per points\n{}\npck_{}\n{}".format(diff_per_pt ,params['pck_threshold'],pck ))
+
+
+df_valid = df_valid.sample(n=20,random_state=3)
+df_pred = df_pred.sample(n=20,random_state=3)
+# df_valid = df_valid[0:20]
+# df_pred = df_pred[0:20]
 
 valid_data = data_input.plumage_data_input(df_valid, df_valid.shape[0] ,scale = 10, state = 'patches',
                                      is_train=True , pre_path = img_path,is_aug=params['img_aug'] )
 
-pred_data = data_input.plumage_data_input(df_pred, df_valid.shape[0] ,scale = 10, state = 'patches',
+pred_data = data_input.plumage_data_input(df_pred, df_pred.shape[0] ,scale = 10, state = 'patches',
                                      is_train=True , pre_path = img_path,is_aug=params['img_aug'] )
 
-_, gt_mask = valid_data.get_next_batch_no_random()
-_,pred_mask = pred_data.get_next_batch_no_random()
+_, gt_mask = valid_data.get_next_batch_no_random_all()
+_, pred_mask = pred_data.get_next_batch_no_random_all()
+
+#Inside polygon metrics
+_, gt_centroid, _ , _ = valid_data.get_next_batch_no_random_all_labels()
+_, pred_centroid, _ , _ = pred_data.get_next_batch_no_random_all_labels()
+
+#Only use the centroids of polygons
+pred_centroid = pred_centroid[:,10:]
+gt_centroid = gt_centroid[:,10:]
+gt_patches = gt_mask[...,1:]
+
+#Check whether centroids are inside patch 
+in_area = in_area_rate(pred_centroid ,gt_centroid, gt_patches)
+
+
+
+
+# Check mean iou and correct prediction
+
 gt_segms = np.argmax(gt_mask, -1)
 pred_segms = np.argmax(pred_mask, -1)
 print("miou", segs_eval(pred_segms , gt_segms , mode="miou"))
-print("correct_pred", segs_eval(pred_segms , gt_segms , mode="correct_pred" , background = None))
+print("correct_pred", segs_eval(pred_segms , gt_segms , mode="correct_pred" , background = 0))
 
-# for i in range(pred_mask.shape[3]):
+print("miou", segs_eval(pred_segms , gt_segms , mode="miou" , per_class=True))
+print("correct_pred", segs_eval(pred_segms , gt_segms , mode="correct_pred" , 
+    background = 0 , per_class=True))
+
+
+# for i in range(1, pred_mask.shape[3]):
 #     gt_seg = gt_mask[...,i]
 #     pred_seg = pred_mask[...,i]
 
 #     print("{} th patch".format(i))
 #     print("miou", segs_eval(pred_seg , gt_seg , mode="miou"))
-#     print("correct_pred", segs_eval(pred_seg , gt_seg , mode="correct_pred" , background = None))
+#     print("correct_pred", segs_eval(pred_seg , gt_seg , mode="correct_pred" , background = 0))
 
 #Save images codes
 if params['save_img']:

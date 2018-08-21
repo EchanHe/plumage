@@ -42,8 +42,8 @@ class HourglassModel():
     Please check README.txt for further information on model management.
     """
     def __init__(self, img_width=256,img_height=256 , img_scale = 20, nFeat = 512, nStack = 4, nModules = 1, nLow = 4, outputDim = 16, 
-        batch_size = 16, drop_rate = 0.2, lear_rate = 2.5e-4, decay = 0.96,
-     decay_step = 2000, data_stream_train = None,data_stream_valid = None,data_stream_test=None, training = True, 
+        batch_size = 16, drop_rate = 0.2, lear_rate = 2.5e-4, decay = 0.96, decay_step = 2000, is_grey = False,
+         data_stream_train = None,data_stream_valid = None,data_stream_test=None, training = True, 
      w_summary = True,logdir_train = None, logdir_test = None , saver_directory = None,
      tiny = True, attention = False,modif = True,w_loss = False,
       name = 'tiny_hourglass',  joints = ['DIY']):
@@ -99,6 +99,7 @@ class HourglassModel():
         self.data_stream_valid = data_stream_valid
         self.data_stream_test = data_stream_test
         self.img_scale = img_scale
+        self.is_grey  = is_grey
     # ACCESSOR
         if not os.path.exists(saver_directory):
             os.makedirs(saver_directory)
@@ -152,41 +153,46 @@ class HourglassModel():
         """
         startTime = time.time()
         print('CREATE MODEL:')
-        with tf.device(self.gpu):
-            with tf.name_scope('inputs'):
-                # Shape Input Image - batchSize: None, height: 256, width: 256, channel: 3 (RGB)
-                self.img = tf.placeholder(dtype= tf.float32, shape= (None, self.img_height, self.img_width, 3), name = 'input_img')
-                if self.w_loss:
-                    self.weights = tf.placeholder(dtype = tf.float32, shape = (None, self.outDim))
-                # Shape Ground Truth Map: batchSize x nStack x 64 x 64 x outDim
-                self.gtMaps = tf.placeholder(dtype = tf.float32, shape = (None, self.nStack, self.output_height, self.output_width, self.outDim))
+        # with tf.device(self.gpu):
+        with tf.name_scope('inputs'):
+            # Shape Input Image - batchSize: None, height: 256, width: 256, channel: 3 (RGB)
+            self.img_input = tf.placeholder(dtype= tf.float32, shape= (None, self.img_height, self.img_width, 3), name = 'input_img')
+            if self.is_grey:
+                self.img = tf.image.rgb_to_grayscale(self.img_input, name='input_img')
+            else:
+                self.img = self.img_input
+            if self.w_loss:
+                self.weights = tf.placeholder(dtype = tf.float32, shape = (None, self.outDim))
+            # Shape Ground Truth Map: batchSize x nStack x 64 x 64 x outDim
+            self.gtMaps = tf.placeholder(dtype = tf.float32, shape = (None, self.nStack, self.output_height, self.output_width, self.outDim))
 
-                ## yichen Ground truth mask of vis:
-                self.visMaps = tf.placeholder(dtype = tf.float32, shape = (None, self.nStack, self.output_height, self.output_width, self.outDim))
-                # print(self.gtMaps.shape)
-                # TODO : Implement weighted loss function
-                # NOT USABLE AT THE MOMENT
-                #weights = tf.placeholder(dtype = tf.float32, shape = (None, self.nStack, 1, 1, self.outDim))
-            inputTime = time.time()
-            print('---Inputs : Done (' + str(int(abs(inputTime-startTime))) + ' sec.)')
-            if self.attention:
-                self.output = self._graph_mcam(self.img)
-            else :
-                self.output = self._graph_hourglass(self.img)
-                print("Hour glass out put: {}".format(self.output))
-            graphTime = time.time()
-            print('---Graph : Done (' + str(int(abs(graphTime-inputTime))) + ' sec.)')
-            with tf.name_scope('loss'):
-                if self.w_loss:
-                    self.loss = tf.reduce_mean(self.weighted_bce_loss(), name='reduced_loss')
-                else:
-                    self.output_mask = tf.multiply(self.output , self.visMaps)
-                    # self.gtMaps_mask = tf.multiply(self.gtMaps , self.visMaps)
+            ## yichen Ground truth mask of vis:
+            self.visMaps = tf.placeholder(dtype = tf.float32, shape = (None, self.nStack, self.output_height, self.output_width, self.outDim))
+            # print(self.gtMaps.shape)
+            # TODO : Implement weighted loss function
+            # NOT USABLE AT THE MOMENT
+            #weights = tf.placeholder(dtype = tf.float32, shape = (None, self.nStack, 1, 1, self.outDim))
+        inputTime = time.time()
+        print('---Inputs : Done (' + str(int(abs(inputTime-startTime))) + ' sec.)')
+        if self.attention:
+            self.output = self._graph_mcam(self.img)
+        else :
+            self.output = self._graph_hourglass(self.img)
+            print("Hour glass out put: {}".format(self.output))
+        graphTime = time.time()
+        print('---Graph : Done (' + str(int(abs(graphTime-inputTime))) + ' sec.)')
+        with tf.name_scope('loss'):
+            if self.w_loss:
+                self.loss = tf.reduce_mean(self.weighted_bce_loss(), name='reduced_loss')
+            else:
+                self.output_mask = tf.multiply(self.output , self.visMaps)
+                # self.gtMaps_mask = tf.multiply(self.gtMaps , self.visMaps)
 
-                    self.loss = tf.reduce_mean(tf.square(tf.subtract(self.output_mask , self.gtMaps)))
-                    # self.loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=self.output, labels= self.gtMaps), name= 'cross_entropy_loss')
-            lossTime = time.time()  
-            print('---Loss : Done (' + str(int(abs(graphTime-lossTime))) + ' sec.)')
+                self.loss = tf.reduce_mean(tf.square(tf.subtract(self.output_mask , self.gtMaps)))
+                # self.loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=self.output, labels= self.gtMaps), name= 'cross_entropy_loss')
+        lossTime = time.time()  
+        print('---Loss : Done (' + str(int(abs(graphTime-lossTime))) + ' sec.)')
+        #self.gpu  
         with tf.device(self.cpu):
             with tf.name_scope('accuracy'):
                 self._accuracy_computation()
@@ -200,17 +206,18 @@ class HourglassModel():
                 self.lr = tf.train.exponential_decay(self.learning_rate, self.train_step, self.decay_step, self.decay, staircase= True, name= 'learning_rate')
             lrTime = time.time()
             print('---LR : Done (' + str(int(abs(accurTime-lrTime))) + ' sec.)')
-        with tf.device(self.gpu):
-            with tf.name_scope('rmsprop'):
-                self.rmsprop = tf.train.RMSPropOptimizer(learning_rate= self.lr)
-            optimTime = time.time()
-            print('---Optim : Done (' + str(int(abs(optimTime-lrTime))) + ' sec.)')
-            with tf.name_scope('minimizer'):
-                self.update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-                with tf.control_dependencies(self.update_ops):
-                    self.train_rmsprop = self.rmsprop.minimize(self.loss, self.train_step)
-            minimTime = time.time()
-            print('---Minimizer : Done (' + str(int(abs(optimTime-minimTime))) + ' sec.)')
+        # with tf.device(self.gpu):
+        with tf.name_scope('rmsprop'):
+            self.rmsprop = tf.train.RMSPropOptimizer(learning_rate= self.lr)
+        optimTime = time.time()
+        print('---Optim : Done (' + str(int(abs(optimTime-lrTime))) + ' sec.)')
+        with tf.name_scope('minimizer'):
+            self.update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+            with tf.control_dependencies(self.update_ops):
+                self.train_rmsprop = self.rmsprop.minimize(self.loss, self.train_step)
+        minimTime = time.time()
+        print('---Minimizer : Done (' + str(int(abs(optimTime-minimTime))) + ' sec.)')
+        #self.gpu    
         self.init = tf.global_variables_initializer()
         initTime = time.time()
         print('---Init : Done (' + str(int(abs(initTime-minimTime))) + ' sec.)')
@@ -354,6 +361,8 @@ class HourglassModel():
         """
         function to train every steps
         """
+        self.time_segments = [0] 
+
         with tf.name_scope('Train'):
             startTime = time.time()
             self.resume = {}
@@ -379,13 +388,17 @@ class HourglassModel():
                         y_stack_mini[:,i_stack,:,:,:] = y_train_mini
                         vis_stack_mini[:,i_stack,:,:,:]  = vis_mini
 
-                    feed_dict = {self.img : X_train_mini, self.gtMaps: y_stack_mini,self.visMaps: vis_stack_mini}
+                    feed_dict = {self.img_input : X_train_mini, self.gtMaps: y_stack_mini,self.visMaps: vis_stack_mini}
+
+                    if epoch ==0 and (i+1)%10 == 0:
+                        #get the time per 100 steps
+                        self.time_segments.append((time.time() - epochstartTime))
 
                     # print(i,saveStep)
                     if (i+1) % saveStep == 0:
                         # print("in save step")
                         _, c, summary = self.Session.run([self.train_rmsprop, self.loss, self.train_op], 
-                            feed_dict = {self.img : X_train_mini, self.gtMaps: y_stack_mini,self.visMaps: vis_stack_mini,self.joint_accur_v2:coord_accuracy})
+                            feed_dict = {self.img_input : X_train_mini, self.gtMaps: y_stack_mini,self.visMaps: vis_stack_mini,self.joint_accur_v2:coord_accuracy})
                         # Save summary (Loss + Accuracy)
                         self.train_summary.add_summary(summary,global_step)
                         self.train_summary.flush()
@@ -436,7 +449,7 @@ class HourglassModel():
                         vis_stack_mini[:,i,:,:,:]  = vis_mini
 
                     output =  self.Session.run(self.output, 
-                    feed_dict =  {self.img : X_valid_mini, self.gtMaps: y_stack_mini,self.visMaps: vis_stack_mini})
+                    feed_dict =  {self.img_input : X_valid_mini, self.gtMaps: y_stack_mini,self.visMaps: vis_stack_mini})
                     output_heatmap = output[:,self.nStack-1,:,:,:]
 
                     acc_list = np.vstack((acc_list,self.coord_accuracy(output , coords_mini)))
@@ -476,7 +489,7 @@ class HourglassModel():
         for i_df_valid in np.arange(0,self.data_stream_valid.df_size,self.batchSize):
             X_valid_mini,_,coords_mini,_ = self.data_stream_valid.get_next_batch_no_random()
 
-            output =  self.Session.run(self.output, feed_dict =  {self.img : X_valid_mini})
+            output =  self.Session.run(self.output, feed_dict =  {self.img_input : X_valid_mini})
 
             acc,pck ,  output_coord = self.coord_accuracy_v2(output , coords_mini ,
              pck_threshold =pck_threshold,validation_scale = validation_scale )
@@ -502,21 +515,22 @@ class HourglassModel():
 
     def get_heatmaps(self, load):
         with tf.name_scope('Session'):
-            with tf.device(self.gpu):
+            # with tf.device(self.gpu):
+            # self._init_weight()
+            self._define_saver_summary()
+            if load is not None:
                 self._init_weight()
-                self._define_saver_summary()
-                if load is not None:
-                    # print("Read check point file: "+load)
-                    self.saver.restore(self.Session, load)
-                heatmap_all= np.ones((self.data_stream_valid.df_size ,self.output_height,self.output_width,self.outDim )) *-1
-                for i_df_valid in np.arange(0,self.data_stream_valid.df_size,self.batchSize):
-                    if self.data_stream_valid.is_train:
-                        X_valid_mini,_,coords_mini,_ = self.data_stream_valid.get_next_batch_no_random()
-                    else:
-                        X_valid_mini = self.data_stream_valid.get_next_batch_no_random()
-                    result = self.Session.run(self.output, feed_dict =  {self.img : X_valid_mini})
-                    heatmap_all[i_df_valid:i_df_valid+self.batchSize,...] = result[:,self.nStack-1,:,:,:]
-
+                # print("Read check point file: "+load)
+                self.saver.restore(self.Session, load)
+            heatmap_all= np.ones((self.data_stream_valid.df_size ,self.output_height,self.output_width,self.outDim )) *-1
+            for i_df_valid in np.arange(0,self.data_stream_valid.df_size,self.batchSize):
+                if self.data_stream_valid.is_train:
+                    X_valid_mini,_,coords_mini,_ = self.data_stream_valid.get_next_batch_no_random()
+                else:
+                    X_valid_mini = self.data_stream_valid.get_next_batch_no_random()
+                result = self.Session.run(self.output, feed_dict =  {self.img_input : X_valid_mini})
+                heatmap_all[i_df_valid:i_df_valid+self.batchSize,...] = result[:,self.nStack-1,:,:,:]
+            #self.gpu
         return heatmap_all
 
     def train_performance(self):
@@ -544,7 +558,7 @@ class HourglassModel():
                     y_stack_mini[:,i_stack,:,:,:] = y_train_mini
                     vis_stack_mini[:,i_stack,:,:,:]  = vis_mini
                 # print("non zeroes: {}".format(np.count_nonzero(vis_stack_mini)))
-                feed_dict = {self.img : X_train_mini, self.gtMaps: y_stack_mini,self.visMaps: vis_stack_mini}
+                feed_dict = {self.img_input : X_train_mini, self.gtMaps: y_stack_mini,self.visMaps: vis_stack_mini}
 
                 _, c, = self.Session.run([self.train_rmsprop, self.loss], feed_dict = feed_dict)
                     # print("non zeroes: {}".format(tf.count_nonzero(self.gtMaps)))
@@ -560,67 +574,7 @@ class HourglassModel():
             #self.weight_summary.flush()
             print(' done in ' + str(epochfinishTime-epochstartTime)+ ' sec.')
 
-    def _pred_old(self):
-        ori_imsize =512
-        out_data_path = "./result.csv"
-        for i_df_valid in np.arange(0,self.data_stream_test.df_size,self.batchSize):
-            X_mini = self.data_stream_test.get_next_batch_no_random_all()
-            output =  self.Session.run(self.output, feed_dict =  {self.img : X_mini})
-            if i_df_valid ==0:
-                result = output[:,-1,:,:,:]
-            else:
-                result = np.vstack((result,output[:,-1,:,:,:]))
-            print(result.shape)
-        df_size = result.shape[0]
-        cnt_size = result.shape[3]
-        output_result = np.ones((df_size,cnt_size*3))
-        for i in range(df_size):
-            for j in range(cnt_size):
-                heat_map = result[i,:,:,j]
-                heat_map = cv2.resize(heat_map, dsize=(ori_imsize, ori_imsize),interpolation = cv2.INTER_NEAREST)
-                map_shape = np.unravel_index(np.argmax(heat_map, axis=None), heat_map.shape)
-                x = map_shape[1]+1
-                y = map_shape[0]+1
-                output_result[i,j*3+0] = x
-                output_result[i,j*3+1] = y
-        output_result = output_result.astype(int)
-        result_pd = pd.DataFrame(output_result)
-
-        pred_df =  self.data_stream_test.df[["image_id","image_category"]]
-        out_data = pd.concat([pred_df,result_pd],axis=1)
-        out_data.to_csv(out_data_path,index=False)
-        print("write the result in: "+ out_data_path)
-
-    def _pred(self):
-        ori_imsize =512
-        out_data_path = "./result.csv"
-        
-        result = np.zeros((self.data_stream_test.df_size,64,64,24))
-        for i_df in np.arange(0,self.data_stream_test.df_size,self.batchSize):
-            X_mini = self.data_stream_test.get_next_batch_no_random_all()
-            output =  self.Session.run(self.output, feed_dict =  {self.img : X_mini})
-            result[i_df:i_df+self.batchSize ,:,:,:] = output[:,-1,:,:,:]
-            if i_df % 1000==0:
-                print(i_df)
-        df_size = result.shape[0]
-        cnt_size = result.shape[3]
-        output_result = np.ones((df_size,cnt_size*3))
-        for i in range(df_size):
-            for j in range(cnt_size):
-                heat_map = result[i,:,:,j]
-                heat_map = cv2.resize(heat_map, dsize=(ori_imsize, ori_imsize),interpolation = cv2.INTER_NEAREST)
-                map_shape = np.unravel_index(np.argmax(heat_map, axis=None), heat_map.shape)
-                x = map_shape[1]+1
-                y = map_shape[0]+1
-                output_result[i,j*3+0] = x
-                output_result[i,j*3+1] = y
-        output_result = output_result.astype(int)
-        result_pd = pd.DataFrame(output_result)
-
-        pred_df =  self.data_stream_test.df[["image_id","image_category"]]
-        out_data = pd.concat([pred_df,result_pd],axis=1)
-        out_data.to_csv(out_data_path,index=False)
-        print("write the result in: "+ out_data_path)    
+  
     def record_training(self, record):
         """ Record Training Data and Export them in CSV file
         Args:
@@ -646,17 +600,17 @@ class HourglassModel():
             load            : Model to load (None if training from scratch) (see README for further information)
         """
         with tf.name_scope('Session'):
-            with tf.device(self.gpu):
-                self._init_weight()
-                self._define_saver_summary()
-                if load is not None:
-                    self.saver.restore(self.Session, load)
-                    #try:
-                        #   self.saver.restore(self.Session, load)
-                    #except Exception:
-                        #   print('Loading Failed! (Check README file for further information)')
-                self._train(nEpochs, epochSize, saveStep, validIter=10)
-                # self.train_performance()
+            # with tf.device(self.gpu):
+            self._init_weight()
+            self._define_saver_summary()
+            if load is not None:
+                self.saver.restore(self.Session, load)
+                #try:
+                    #   self.saver.restore(self.Session, load)
+                #except Exception:
+                    #   print('Loading Failed! (Check README file for further information)')
+            self._train(nEpochs, epochSize, saveStep, validIter=10)
+            #self.gpu
     
     def validing_init(self, pck_threshold = 10, validation_scale = 1,load = None):
         #valid the accuracy of validating set

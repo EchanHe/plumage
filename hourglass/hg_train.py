@@ -31,8 +31,6 @@ params = process_config(os.path.join(dirname, config_name))
 
 
 print("Read training set data: ...")
-rootdir = params['work_dir']
-
 
 df_train = pd.read_csv(params['train_file'])
 df_valid = pd.read_csv(params['valid_file'])
@@ -53,9 +51,10 @@ print("Read valid set data: ...")
 # df_valid = df_valid[:10]
 valid_data = data_input.plumage_data_input(df_valid,params['batch_size'],scale = params['scale'], state = params['data_state'],
                                          is_train=True , pre_path = params['img_folder'],is_aug=params['img_aug'] )
-epochSize = input_data.df_size
+
+epochSize = input_data.df_size // params["batch_size"]
 total_steps = (epochSize * params['nepochs']) //params["batch_size"]
-summary_steps = total_steps // params['summary_interval']
+summary_steps = epochSize // params['summary_interval']
 
 
 model = HourglassModel(img_width = params['img_width'],img_height=params['img_height'] ,img_scale = params['scale'],
@@ -68,7 +67,7 @@ model = HourglassModel(img_width = params['img_width'],img_height=params['img_he
                        tiny= params['tiny'], w_loss=params['weighted_loss'],w_summary=True , joints= params['joint_list'],modif=False)
 model.generate_model()
 load_file = None
-model.training_init(nEpochs=params['nepochs'], epochSize=total_steps, saveStep=summary_steps, load = load_file)
+model.training_init(nEpochs=params['nepochs'], epochSize=epochSize, saveStep=summary_steps, load = load_file)
 
 
 heatmaps = model.get_heatmaps(load = load_file)

@@ -4,6 +4,7 @@ from datetime import date
 import os
 def process_config(conf_file):
     """
+    Read the config file into dictionary
     """
     params = {}
     config = configparser.ConfigParser()
@@ -30,6 +31,24 @@ def process_config(conf_file):
             for option in config.options(section):
                 params[option] = eval(config.get(section, option))
     return params
+
+
+def generate_grid_params(params):
+    """
+    Decide whether a config has list param, so it is used for grid search.
+
+    Return a dictionary with {Name: value parameters}
+    """
+    keys = ['scale' , 'is_grey']
+    grid_params = {}
+
+    for key in keys:
+        if isinstance(params[key] ,list):
+            grid_params[key] = params[key]
+
+    return grid_params
+
+
 
 def save_config(conf_file , save_dir):
     """

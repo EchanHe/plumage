@@ -9,7 +9,7 @@ import numpy as np
 from seg_util import *
 
 
-def segs_eval(pred_segms , gt_segms , mode="pixel_acc" , background = 0):
+def segs_eval(pred_segms , gt_segms , mode="pixel_acc" , background = 0, per_class = False):
     """
     Average metrics of a batch of predict and ground truth segmentation with given mode.
 
@@ -17,25 +17,47 @@ def segs_eval(pred_segms , gt_segms , mode="pixel_acc" , background = 0):
         pred_segms [batch_size, height, width ]
         gt_segms [batch_size, height, width ]
         mode: The metrics used
+        background: The ID of background. default is 0.
+        per_class: return the metrics per different class
+
+    return: 
+        mean metrics
+        metrics per different classes [n classes]
+
     """
     check_df_size(pred_segms, gt_segms)
     df_size = pred_segms.shape[0]
-    sum_acc=0
-    if mode== "pixel_acc":
-        for i in np.arange(df_size):
-            sum_acc+=pixel_accuracy(pred_segms[i,...],gt_segms[i,...])
-    elif mode =="miou":
-        for i in np.arange(df_size):
-            sum_acc+= mean_IU(pred_segms[i,...],gt_segms[i,...])
-    elif mode =="mean_acc":
-        for i in np.arange(df_size):
-            sum_acc+= mean_accuracy(pred_segms[i,...],gt_segms[i,...])
-    elif mode =="correct_pred":
-        for i in np.arange(df_size):
-            sum_acc+= correct_pred(pred_segms[i,...],gt_segms[i,...] ,background)
+    if not per_class:
+        acc_list = np.zeros((df_size))
 
+        for i in np.arange(df_size):
+            if mode== "pixel_acc":
+                acc_list[i] = pixel_accuracy(pred_segms[i,...],gt_segms[i,...])
+            elif mode =="miou":
+                acc_list[i]= mean_IU(pred_segms[i,...],gt_segms[i,...])
+            elif mode =="mean_acc":
+                acc_list[i]= mean_accuracy(pred_segms[i,...],gt_segms[i,...])
+            elif mode =="correct_pred":
+                acc_list[i]= correct_pred(pred_segms[i,...],gt_segms[i,...] ,background)
+        return round(np.nanmean(acc_list), 4)
 
-    return round(sum_acc/df_size , 4)
+    else:
+        class_num = np.max(gt_segms) +1
+        acc_list = np.zeros((df_size, class_num))
+        for j in range(0 , class_num ):
+            gt_seg = (gt_segms == j).astype(int)
+            pred_seg = (pred_segms == j).astype(int)
+            for i in np.arange(df_size):
+                if mode== "pixel_acc":
+                    acc_list[i, j] = pixel_accuracy(pred_seg[i,...],gt_seg[i,...])
+                elif mode =="miou":
+                    acc_list[i, j]= mean_IU(pred_seg[i,...],gt_seg[i,...])
+                elif mode =="mean_acc":
+                    acc_list[i, j]= mean_accuracy(pred_seg[i,...],gt_seg[i,...])
+                elif mode =="correct_pred":
+                    acc_list[i, j]= correct_pred(pred_seg[i,...],gt_seg[i,...],background)
+        return np.round(np.nanmean(acc_list , axis = 0) , 4)
+
 
 def correct_pred(eval_segm, gt_segm, background):
     '''
@@ -49,12 +71,10 @@ def correct_pred(eval_segm, gt_segm, background):
     _, n_cl_gt = extract_classes(gt_segm)
     eval_mask, gt_mask = extract_both_masks(eval_segm, gt_segm, cl, n_cl)
 
-    sum_n_ii = 0
-    sum_t_i  = 0
     IU = list([0]) * n_cl
 
     for i, c in enumerate(cl):
-        if c !=0:
+        if c != background:
             curr_eval_mask = eval_mask[:, :, i]
             curr_gt_mask = gt_mask[:, :, i]
      
@@ -64,8 +84,14 @@ def correct_pred(eval_segm, gt_segm, background):
             n_ii = np.sum(np.logical_and(curr_eval_mask, curr_gt_mask))
             n_ij = np.sum(curr_eval_mask)
             IU[i] = n_ii / n_ij
-    mean_IU_ = np.sum(IU) / (n_cl_gt - 1)
-    return mean_IU_
+
+    if (n_cl_gt - 1) == 0:
+        return np.nan
+    if background is not None:        
+        precision = np.sum(IU) / (n_cl_gt - 1)
+    else:
+        precision = np.sum(IU) / (n_cl_gt)
+    return precision
 
 
 def pixel_accuracy(eval_segm, gt_segm):
@@ -146,7 +172,7 @@ def mean_IU(eval_segm, gt_segm):
         n_ij = np.sum(curr_eval_mask)
         # print(n_ii,t_i , n_ij )
         IU[i] = n_ii / (t_i + n_ij - n_ii)
-        # print(IU[i] )
+        # print(c ,":" ,IU[i] )
     mean_IU_ = np.sum(IU) / n_cl_gt
     return mean_IU_
 

@@ -56,7 +56,7 @@ def extract_masks(segm, cl, n_cl):
     masks = np.zeros((h, w , n_cl))
 
     for i, c in enumerate(cl):
-        masks[:, : , i] = segm == c
+        masks[:, : , c] = segm == c
 
     return masks
 def segm_size(segm):
@@ -76,8 +76,8 @@ class plumage_data_input:
     file_info_cols = ['file.vis', 'file.uv', 'view' , 'img.missing']
 
     patches_cols = ['poly.crown' , 'poly.nape','poly.mantle', 'poly.rump', 'poly.tail',
-    'poly.wing.coverts',   'poly.wing.primaries.secondaries',
-     'poly.throat', 'poly.breast', 'poly.belly', 'poly.tail.underside']
+    'poly.throat', 'poly.breast', 'poly.belly', 'poly.tail.underside',
+     'poly.wing.coverts',   'poly.wing.primaries.secondaries']
     coords_cols = ['s02.standard_x', 's02.standard_y', 's20.standard_x', 's20.standard_y',
        's40.standard_x', 's40.standard_y', 's80.standard_x', 's80.standard_y',
        's99.standard_x', 's99.standard_y','crown_x', 'crown_y', 'nape_x',
@@ -122,7 +122,7 @@ class plumage_data_input:
         self.indices = np.arange(self.df_size)
         np.random.shuffle(self.indices)
 
-        filepath_test = pre_path+df.iloc[0,0]
+        filepath_test = pre_path+df.loc[df.index[0],self.file_name_col]
         img = cv2.imread(filepath_test)
 #         img = Image.open(filepath_test)
         self.img_width= img.shape[1]
@@ -230,6 +230,8 @@ class plumage_data_input:
         df_size = self.df_size
         is_train = self.is_train
 
+        if self.start_idx+1>=df_size:
+            self.start_idx = 0
         
         if self.start_idx >= (df_size - batch_size+1):
             df_mini = self.df.iloc[self.start_idx : ]
@@ -261,7 +263,8 @@ class plumage_data_input:
         df_size = self.df_size
         is_train = self.is_train
 
-        
+        if self.start_idx+1>=df_size:
+            self.start_idx = 0
         if self.start_idx >= (df_size - batch_size+1):
             df_mini = self.df.iloc[self.start_idx : ]
         else: 

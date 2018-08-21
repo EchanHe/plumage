@@ -40,12 +40,19 @@ patches_cols = ['poly.crown', 'poly.nape','poly.mantle', 'poly.rump', 'poly.tail
      'poly.wing.coverts',   'poly.wing.primaries.secondaries']
 
      
-### Goal: write prediction coordinates to DATAFRAME csv
-# Params: gt_df: dataframe of ground truth. 
-# Params: pred_coord [batch , lm_cnt * 2 ].
-def write_pred_dataframe(valid_data , pred_coord , folder,file_name , patches_coord=None):
-    df_file_names = valid_data.df[['file.vis', 'view']]
+def write_pred_dataframe(valid_data , pred_coord , folder,file_name , patches_coord=None ):
+    """
+    Goal: write prediction coordinates to DATAFRAME csv and return the panda dataframe
 
+    params:
+        valid_data: panda dataframe of validation data. used for giving file name and types
+        pred_coord: prediction coordiantes shape [batch_size , 2 * landmark]
+        folder: folder to save
+        file_name: name of the csv file. When is None, function doesn't save the csv
+        patches_coord: lists of coodinates for each patch. [batch_size, n patches] (dtype = list)
+    """
+    df_file_names = valid_data.df[['file.vis', 'view']]
+    df_file_names = df_file_names.reset_index()
     result = pd.DataFrame(pred_coord, columns = valid_data.coords_cols )
     if not os.path.exists(folder):
         os.makedirs(folder)
@@ -61,7 +68,8 @@ def write_pred_dataframe(valid_data , pred_coord , folder,file_name , patches_co
     result.loc[result['view']=='belly', no_belly_cols]=-1
     result.loc[result['view']=='side', no_side_cols]=-1
 
-    result.to_csv(folder+file_name+".csv" , index =False)
+    if file_name is not None:
+        result.to_csv(folder+file_name+".csv" , index =False)
     return result
 
 ### Goal: write the evaluation on json

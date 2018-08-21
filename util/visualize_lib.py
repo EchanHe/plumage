@@ -22,7 +22,14 @@ color_list = [np.array([255,0,0]),
               np.array([0,0,255]),
               np.array([255,255,0]),
               np.array([0,255,255]) ,
-              np.array([255,0,255])]
+              np.array([255,0,255]),
+              np.array([255,0,0]),
+              np.array([0,255,0]) ,
+              np.array([0,0,255]),
+              np.array([255,255,0]),
+              np.array([0,255,255]) ,
+              np.array([255,0,255])
+              ]
 
 
 def save_masks_on_image(images, pred_segs, save_path, fig_names=None):
