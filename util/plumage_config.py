@@ -39,12 +39,13 @@ def generate_grid_params(params):
 
     Return a dictionary with {Name: value parameters}
     """
-    keys = ['scale' , 'is_grey']
+    keys = ['scale' , 'is_grey' , 'nstacks']
     grid_params = {}
 
     for key in keys:
-        if isinstance(params[key] ,list):
-            grid_params[key] = params[key]
+        if key in params.keys():
+            if isinstance(params[key] ,list):
+                grid_params[key] = params[key]
 
     return grid_params
 

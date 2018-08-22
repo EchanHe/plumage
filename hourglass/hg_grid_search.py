@@ -69,8 +69,8 @@ if bool(grid_params):
         df_train = pd.read_csv(params['train_file'])
         df_valid = pd.read_csv(params['valid_file'])
 
-        df_train = df_train.sample(n=200,random_state=3)
-        df_valid = df_valid.sample(n=20,random_state=3)
+        # df_train = df_train.sample(n=20,random_state=3)
+        # df_valid = df_valid.sample(n=5,random_state=3)
 
         # df=df[:1]
 
@@ -159,17 +159,21 @@ if bool(grid_params):
         iou =  segs_eval(pred_segms , gt_segms , mode="miou" , per_class=True)
         precision =  segs_eval(pred_segms , gt_segms , mode="correct_pred" , background = 0 , per_class=True)
 
-        accuracy = {'pck{}'.format(params['pck_threshold']) : str(pck),
-                    'diff_per_pt': str(diff_per_pt),
-                    'in poly': str(in_area),
-                    'mean_iou': str(miou),
-                    'mean_precision': str(m_precision),
-                    'iou': str(iou),
-                    'precision': str(precision),
+        accuracy = {'pck{}'.format(params['pck_threshold']) : pck,
+                    'diff_per_pt': diff_per_pt,
+                    'in_poly': in_area,
+                    'mean_pck': np.nanmean(pck),
+                    'mean_diff_per_pt': np.nanmean(diff_per_pt),
+                    'mean_in_poly': np.nanmean(in_area),
+                    'iou': iou,
+                    'precision': precision,
+                    'mean_iou': miou,
+                    'mean_precision': m_precision,
                     'running time':model.time_segments
                      }
         df_accuracy = pd.DataFrame.from_dict(accuracy, orient='index')      
-        df_accuracy.columns = [col_name]  
+        df_accuracy.columns = [col_name] 
+        print(df_accuracy.iloc[:,0]) 
         df_lists.append(df_accuracy)
 pd.concat(df_lists,axis = 1).to_csv(params['valid_result_dir'] + "{}grid_search.csv".format(str(date.today())))
 
