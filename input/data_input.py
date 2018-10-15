@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 
 
-from PIL import Image
 from scipy.ndimage import gaussian_filter
 import cv2
 
@@ -17,24 +16,42 @@ import math
 from PIL import ImageEnhance,ImageChops,ImageOps,ImageFilter
 import sys
 
-#Check the masks are Mutually Exclusive
+
 def check_masks(masks):
+    """
+    Check masks are Mutually Exclusive
+    By going through every mask
+    """
     for mask in masks:
         if not check_mask(mask):
             return False
     return True
 
 def check_mask(mask):
+    """
+    Check mask is mutually exclusive
+    By checking the sum of every class is equal to the total pixels
+    """
     img_wid = mask.shape[1]
     img_hei = mask.shape[0]
     sum_pixel = 0 
     for c in range(mask.shape[2]):
         sum_pixel += np.sum(mask[...,c])
-#     print(sum_pixel , img_wid*img_hei)
+
     return  sum_pixel == (img_wid*img_hei)
 
 # Change 
 def segs_to_masks(segs , n_cl):
+    """
+    Transfer segmentaions to masks
+    
+    params
+        segs: [batch_size, height, width]
+        n_cl: total classes number
+    
+    return masks [batch_size, height, width, n_cl]
+    """
+    
     assert len(segs.shape) ==3 , "Make sure input is [batch_size , height, width]"
     df_size = segs.shape[0]
 
@@ -44,6 +61,7 @@ def segs_to_masks(segs , n_cl):
         masks[i,...] = extract_masks(segs[i,...] , cl, n_cl)
 
     return masks
+#-----helper functions of segs_to_masks----
 
 def extract_classes(segm):
     cl = np.unique(segm)
@@ -67,11 +85,17 @@ def segm_size(segm):
         raise
     return height, width
 
+#-----helper functions of segs_to_masks----
+
+
 # Data class
 class plumage_data_input:
     """
     Class that read a dataframe
+    and output the images and labels for the network
     """
+    
+    #---- basic config ----
     file_name_col = 'file.vis'
     file_info_cols = ['file.vis', 'file.uv', 'view' , 'img.missing']
 
@@ -92,6 +116,8 @@ class plumage_data_input:
     
     aug_option = {'trans' :True , 'rot' :True , 'scale' :True}
     STATE_OPTIONS = ['coords', 'contour', 'patches']
+    
+    #---basic config ---
     def __init__(self,df,batch_size,is_train,pre_path, state,scale=1 ,is_aug = True):
         """
         init function for the data
@@ -146,6 +172,14 @@ class plumage_data_input:
         
     
     def get_next_batch(self):
+        """
+        Return the images and different labels
+        
+        Options:
+            Can return augmentation images and labels
+            randomly Return coordiantion or patches or outline labels.
+        
+        """
         #Augmentation is only in this next batch.
         batch_size = self.batch_size
         df_size = self.df_size
@@ -160,11 +194,7 @@ class plumage_data_input:
         df_mini = self.df.iloc[excerpt].copy()
         
         self.start_idx += batch_size
-        #returning X and y 
-        if self.is_aug:
-            x_mini, df_mini = self.get_x_df_aug(df_mini)
-            
-        # print(df_mini)
+
         if is_train:
             # Return a batch of coords
             if self.state =='coords':
@@ -186,10 +216,9 @@ class plumage_data_input:
                     y_mini = self.get_y_contour(df_mini)
                 if self.is_aug:
                     x_mini , y_mini = self.get_x_masks_aug(x_mini , y_mini)
-                # print("The mask :" ,check_masks(y_mini))
+                print("The mask :" ,check_masks(y_mini))
                 if check_masks(y_mini) ==False:
                     y_mini = segs_to_masks(np.argmax(y_mini , 3) , self.output_channel)
-                # print("The mask :" ,check_masks(y_mini))
                 return x_mini , y_mini
 
         else:
@@ -315,7 +344,9 @@ class plumage_data_input:
         
         output_map = np.zeros((self.batch_size , height,width ,  len(cols)+1))
 
-        patches = df[cols].as_matrix()
+        # PD future warning
+        # patches = df[cols].as_matrix()
+        patches = df[cols].values
         for row in np.arange(patches.shape[0]):
             for col in np.arange(patches.shape[1]):
                 patch = patches[row,col]
@@ -340,7 +371,9 @@ class plumage_data_input:
         
         output_map = np.zeros((self.batch_size , height,width ,  len(cols)+1))
 
-        patches = df[cols].as_matrix()
+        #pd future warning
+        # patches = df[cols].as_matrix()
+        patches = df[cols].values
         for row in np.arange(patches.shape[0]):
             for col in np.arange(patches.shape[1]):
 #                 img = Image.new('1', (width, height), 0)
@@ -369,9 +402,9 @@ class plumage_data_input:
             return None 
 
         if _check_exist_cols(cols , self.all_columns):
-            
-            patches = df[cols].as_matrix()
-
+            #pd future warning
+            # patches = df[cols].as_matrix()
+            patches = df[cols].values
             patches_coords = [0]* patches.shape[0]
             for row in np.arange(patches.shape[0]):
                 patch_coords = []
@@ -392,7 +425,10 @@ class plumage_data_input:
         l_m_columns = self.coords_cols
         cols_num_per_coord = self.cols_num_per_coord
 
-        y_coord = df[l_m_columns].as_matrix()
+        #pd future warning
+        # y_coord = df[l_m_columns].as_matrix()
+        y_coord = df[l_m_columns].values
+
         return y_coord//scale
 
         y_coord[:,np.arange(0,y_coord.shape[1],3)] = y_coord[:,np.arange(0,y_coord.shape[1],3)]/scale
@@ -429,8 +465,9 @@ class plumage_data_input:
         l_m_columns = self.coords_cols
         cols_num_per_coord = self.cols_num_per_coord
 
-        y_coord = df[l_m_columns].as_matrix()
-
+        #pd future warnings
+        # y_coord = df[l_m_columns].as_matrix()
+        y_coord = df[l_m_columns].values
 
         lm_cnt = self.lm_cnt
 
@@ -507,7 +544,11 @@ class plumage_data_input:
         返回[m,64,64,landmark]的关键点是否能看到热点图
         """
         l_m_columns = self.coords_cols
-        y_coord = df[l_m_columns].as_matrix()
+
+        #pd future warnings
+        # y_coord = df[l_m_columns].as_matrix()
+        y_coord = df[l_m_columns].values
+        
         lm_cnt = self.lm_cnt
         df_size = y_coord.shape[0]
 
@@ -540,7 +581,7 @@ class plumage_data_input:
         x_all = np.zeros((size, height , width,3))
 
         img_id=0
-
+        print(df.shape)
         for idx,row in df.iterrows(): 
             filename = folder+row[self.file_name_col]
             img = cv2.imread(filename)
@@ -548,47 +589,53 @@ class plumage_data_input:
             img_hei = img.shape[0]
             img_wid = img.shape[1]
 #             img = cv2.resize(img, dsize=(width,height), interpolation=cv2.INTER_CUBIC)
-            aug_prob = 1
+            aug_prob = random()
             if aug_prob > 0.5:
                 
-                #-----平移----
-                min_offset = 0
-                max_offset = 1000
-                trans_lr = choice([randint(min_offset,max_offset) , randint(-max_offset,-min_offset)] ) #left/right (i.e. 5/-5)
+                
+                #-----Translate----
+                if self.aug_option['trans']:
+#                 if False:
+                    min_offset = 0
+                    max_offset = 1000
+                    trans_lr = choice([randint(min_offset,max_offset) , randint(-max_offset,-min_offset)] ) #left/right (i.e. 5/-5)
 
-                trans_ud = choice([randint(min_offset,max_offset) , randint(-max_offset,-min_offset)] ) #up/down (i.e. 5/-5)
+                    trans_ud = choice([randint(min_offset,max_offset) , randint(-max_offset,-min_offset)] ) #up/down (i.e. 5/-5)
 
-                
-                old_row = row.copy()
-                for i in np.arange(0,len(l_m_columns),self.cols_num_per_coord):
-                    id_x = l_m_columns[i]
-                    id_y = l_m_columns[i+1]
-                    id_vis = l_m_columns[i]
-                    if row[id_vis] !=-1:
-                        row[id_x] = row[id_x] + trans_lr
-                        row[id_y] = row[id_y] + trans_ud
-                        inside = row[id_x]>self.img_width or row[id_x]<0 or row[id_y]>self.img_height or row[id_y]<0 
-                        if inside:
-                            trans_lr=0
-                            trans_ud = 0
-                            row= old_row
-                            break
-                M = np.float32([[1,0,trans_lr],[0,1,trans_ud]])
-                
-                img = cv2.warpAffine(img,M,(img_wid,img_hei))
-#                 img = img.transform(img.size, Image.AFFINE, (1, 0, trans_lr, 0, 1, trans_ud))
-                
+
+                    old_row = row.copy()
+                    for i in np.arange(0,len(l_m_columns),self.cols_num_per_coord):
+                        id_x = l_m_columns[i]
+                        id_y = l_m_columns[i+1]
+                        id_vis = l_m_columns[i]
+                        if row[id_vis] !=-1:
+                            row[id_x] = row[id_x] + trans_lr
+                            row[id_y] = row[id_y] + trans_ud
+                            inside = row[id_x]>self.img_width or row[id_x]<0 or row[id_y]>self.img_height or row[id_y]<0 
+                            if inside:
+#                                 print(idx, "outside")
+                                trans_lr=0
+                                trans_ud = 0
+                                row= old_row
+                                break
+                    M = np.float32([[1,0,trans_lr],[0,1,trans_ud]])
+
+                    img = cv2.warpAffine(img,M,(img_wid,img_hei))
+    #                 img = img.transform(img.size, Image.AFFINE, (1, 0, trans_lr, 0, 1, trans_ud))
+
 
                 
                 
                 # ---------Rotate--------
                 if self.aug_option['rot']:
+#                 if False:    
                     angle_bound = 30
                     angle = randint(-angle_bound,angle_bound)
-                    # angle =15
+#                     angle =15
                     radian = math.pi/180*angle
 
                     old_row = row.copy()
+                    
                     for i in np.arange(0,len(l_m_columns),self.cols_num_per_coord):
                         id_x = l_m_columns[i]
                         id_y = l_m_columns[i+1]
@@ -603,7 +650,9 @@ class plumage_data_input:
                             row[id_y] =int ((self.img_height-(row[id_y]+self.img_height/2 )))
                             inside = row[id_x]>self.img_width or row[id_x]<0 or row[id_y]>self.img_height or row[id_y]<0 
                             if inside:
+#                                 print(idx, "outside")
                                 angle=0
+                                
                                 row= old_row
                                 break
                     M = cv2.getRotationMatrix2D((img_wid/2,img_hei/2),angle,1)
@@ -613,8 +662,9 @@ class plumage_data_input:
                 
                 ##-----Scale------
                 if self.aug_option['scale']:
+#                 if False:
                     #scale value:
-                    scale_ratio = randint(10,20)/10
+                    scale_ratio = randint(10,15)/10
 #                     scale_ratio = 1.5
                     new_scaled_width = (int(self.img_width/scale_ratio))
                     new_scaled_height = (int(self.img_height/scale_ratio))
@@ -669,7 +719,8 @@ class plumage_data_input:
                         img = img.filter(ImageFilter.UnsharpMask)
                     elif sharp_blur<0.3:
                         img = img.filter(ImageFilter.BLUR)
-
+#             print("new row", row[self.coords_cols].values)
+#             print("old rows", old_row[self.coords_cols].values)
             df.loc[idx,:] = row      
             img = cv2.resize(img, dsize=(width,height), interpolation=cv2.INTER_CUBIC)
             x_all[img_id,:,:,:] = img
@@ -689,20 +740,19 @@ class plumage_data_input:
             img = x[idx,...].copy()
             mask = masks[idx,...].copy()
             
-            aug_prob =  random()  
+            aug_prob = 1# random()  
             if aug_prob > 0.5:
                 
                 #-----Translate----
                 if self.aug_option['trans']:
                     min_offset = 0
-                    max_offset = 100
+                    max_offset = 1000//self.scale
                     trans_lr = choice([randint(min_offset,max_offset) , randint(-max_offset,-min_offset)] ) #left/right (i.e. 5/-5)
 
                     trans_ud = choice([randint(min_offset,max_offset) , randint(-max_offset,-min_offset)] ) #up/down (i.e. 5/-5)
-
-
+                    
                     M = np.float32([[1,0,trans_lr],[0,1,trans_ud]])
-
+        
                     img = cv2.warpAffine(img,M,(img_wid,img_hei))
                     mask  = cv2.warpAffine(mask,M,(img_wid,img_hei))
     #                 img = img.transform(img.size, Image.AFFINE, (1, 0, trans_lr, 0, 1, trans_ud))
@@ -711,7 +761,8 @@ class plumage_data_input:
                 if self.aug_option['rot']:
                     angle_bound = 20
                     angle = randint(-angle_bound,angle_bound)
-                    # angle =15
+
+#                     print(angle)
                     radian = math.pi/180*angle
 
                     M = cv2.getRotationMatrix2D((img_wid/2,img_hei/2),angle,1)
@@ -753,14 +804,20 @@ class plumage_data_input:
                         img = img[delta_h//2:delta_h//2+img_hei ,  delta_w//2: delta_w//2+img_wid,:]
                         mask = mask[delta_h//2:delta_h//2+img_hei ,  delta_w//2: delta_w//2+img_wid,:]
         
-            seg = np.argmax(mask , axis=2)
-            cl_aug, n_cl_aug = extract_classes(seg )
-            if n_cl_aug == n_cl:
+            seg_aug = np.argmax(mask , axis=2)
+            cl_aug, n_cl_aug = extract_classes(seg_aug)
+            
+            seg_old = np.argmax(masks[idx,...], axis = -1)
+            cl_old, n_cl_old = extract_classes(seg_old)
+#             print(cl_aug, cl_old , n_cl)
+#             print(np.array_equal(cl_aug, cl_old))
+            #After augmentation, check the classes if is equal to original classes
+        
+            if mask.shape[-1]== n_cl and np.array_equal(cl_aug, cl_old):
                 x[idx,...] = img
                 masks[idx,...] = mask
         
         return x, masks
-
 
 def _check_exist_cols(cols , total_cols):
     return set(cols).issubset(set(total_cols))

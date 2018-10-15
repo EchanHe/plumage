@@ -3,7 +3,6 @@ TRAIN LAUNCHER
 
 """
 
-
 import tensorflow as tf
 
 from hourglass_tiny import HourglassModel
@@ -13,7 +12,7 @@ import pandas as pd
 import sys
 import itertools
 from datetime import date
-# import hg_data_input
+# import hg_data_input and other library
 dirname = os.path.dirname(__file__)
 input_lib_dir= os.path.abspath(os.path.join(dirname,"../input"))
 util_lib_dir= os.path.abspath(os.path.join(dirname,"../util"))
@@ -69,6 +68,7 @@ if bool(grid_params):
         df_train = pd.read_csv(params['train_file'])
         df_valid = pd.read_csv(params['valid_file'])
 
+        # sampling the training data for faster testing.
         # df_train = df_train.sample(n=20,random_state=3)
         # df_valid = df_valid.sample(n=5,random_state=3)
 
@@ -124,8 +124,6 @@ if bool(grid_params):
                 #PCK accuracy:
         diff_per_pt ,pck= pck_accuracy(pred_coord , gt_coords, lm_cnt=lm_cnt , pck_threshold = params['pck_threshold'],scale = 1)
 
-        # df_valid = df_valid[80:90]
-        # df_pred = df_pred[80:90]
 
         valid_data = data_input.plumage_data_input(df_valid, df_valid.shape[0] ,scale = 10, state = 'patches',
                                              is_train=True , pre_path = params['img_folder'],is_aug=params['img_aug'] )
