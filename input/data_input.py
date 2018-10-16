@@ -173,7 +173,8 @@ class plumage_data_input:
     
     def get_next_batch(self):
         """
-        Return the images and different labels
+        Return the images and different labels 
+        in batch and random order
         
         Options:
             Can return augmentation images and labels
@@ -216,7 +217,7 @@ class plumage_data_input:
                     y_mini = self.get_y_contour(df_mini)
                 if self.is_aug:
                     x_mini , y_mini = self.get_x_masks_aug(x_mini , y_mini)
-                print("The mask :" ,check_masks(y_mini))
+                #print("The mask :" ,check_masks(y_mini))
                 if check_masks(y_mini) ==False:
                     y_mini = segs_to_masks(np.argmax(y_mini , 3) , self.output_channel)
                 return x_mini , y_mini
@@ -537,7 +538,7 @@ class plumage_data_input:
                     y_map[j,:,:,i] = cv2.resize(y_map_ori, dsize=(width, height),interpolation = cv2.INTER_NEAREST)
                     # y_map[j,y,x,i]=1
         y_map = np.round(y_map,8)
-        print(y_map.shape)
+        #print(y_map.shape)
         return y_map
     def get_y_vis_map(self ,df):
         """
@@ -581,7 +582,6 @@ class plumage_data_input:
         x_all = np.zeros((size, height , width,3))
 
         img_id=0
-        print(df.shape)
         for idx,row in df.iterrows(): 
             filename = folder+row[self.file_name_col]
             img = cv2.imread(filename)

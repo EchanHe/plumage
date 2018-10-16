@@ -157,21 +157,27 @@ if bool(grid_params):
         iou =  segs_eval(pred_segms , gt_segms , mode="miou" , per_class=True)
         precision =  segs_eval(pred_segms , gt_segms , mode="correct_pred" , background = 0 , per_class=True)
 
-        accuracy = {'pck{}'.format(params['pck_threshold']) : pck,
+        running_time = np.round(np.array(model.time_segments),1)
+        accuracy = {
+                    'mean_pck': round(np.nanmean(pck),4),
+                    'mean_diff_per_pt': round(np.nanmean(diff_per_pt),4),
+                    'mean_in_poly': round(np.nanmean(in_area),4) ,
+                    'pck{}'.format(params['pck_threshold']) : pck,
                     'diff_per_pt': diff_per_pt,
                     'in_poly': in_area,
-                    'mean_pck': np.nanmean(pck),
-                    'mean_diff_per_pt': np.nanmean(diff_per_pt),
-                    'mean_in_poly': np.nanmean(in_area),
                     'iou': iou,
                     'precision': precision,
                     'mean_iou': miou,
                     'mean_precision': m_precision,
-                    'running time':model.time_segments
+                    'running time':running_time
                      }
-        df_accuracy = pd.DataFrame.from_dict(accuracy, orient='index')      
+
+        df_accuracy =pd.DataFrame(list(accuracy.items()))
+        df_accuracy = df_accuracy.set_index(0)
+        # print(accuracy)             
+        # df_accuracy = pd.DataFrame.from_dict(accuracy, orient='index')      
         df_accuracy.columns = [col_name] 
-        print(df_accuracy.iloc[:,0]) 
+        # print(df_accuracy.iloc[:,0]) 
         df_lists.append(df_accuracy)
 pd.concat(df_lists,axis = 1).to_csv(params['valid_result_dir'] + "{}grid_search.csv".format(str(date.today())))
 
