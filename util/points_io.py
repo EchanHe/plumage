@@ -5,15 +5,6 @@ import os
 import json
 from datetime import date
 from points_metrics import pck_accuracy
-### Goal: write coords only in csv
-# Params: pred_coords, gt_coords [batch , lm_cnt * 2 ].
-def write_coord(pred_coords , gt_coords , folder,file_name = "hg_valid_coords" ):
-    pred_file_name = folder + file_name+"_pred.csv"
-    gt_file_name = folder +file_name + "_gt.csv"
-    print("Save VALID prediction in "+pred_file_name)
-    print("save GROUND TRUTH in " + gt_file_name)
-    np.savetxt(pred_file_name, pred_coords, delimiter=",")
-    np.savetxt(gt_file_name, gt_coords, delimiter=",")
 
 no_back_cols = ['throat_x', 'throat_y', 'breast_x', 'breast_y', 'belly_x',
        'belly_y', 'tail.underside_x', 'tail.underside_y', 'wing.coverts_x',
@@ -76,6 +67,18 @@ def write_pred_dataframe(valid_data , pred_coord , folder,file_name , patches_co
 # Params: gt_df: dataframe of ground truth. pred_coords [batch , lm_cnt * 2 ].
 
 def write_point_result(pred_coord , gt_coords,lm_cnt, params, folder):
+    """
+    Goal: write the evaluation (PCK, pixel difference) on json
+
+    params:
+        pred_coords: predicted coordinates, shape:[batch , lm_cnt * 2]
+        gt_coords: ground-truth coordinates. shape:[batch , lm_cnt * 2]
+        lm_cnt: landmark count
+        params: hyperparams and config dictionary
+        folder: dir for saving the json
+    """
+
+
     if not os.path.exists(folder):
         os.makedirs(folder)
     pck_threshold = params['pck_threshold']
@@ -101,6 +104,10 @@ def write_point_result(pred_coord , gt_coords,lm_cnt, params, folder):
 ### Goal: Get the dictionray from params.
 # Used in write_point_result
 def get_info_from_params_points(params):
+    """
+    Goal: Get useful properties of the config dictionray.
+    """
+
     outputs = {}
     keys = ["name", "category" ,"img_aug", "nepochs" , "learning_rate","batch_size",
      "decay_step" , "decay_step" , "dropout_rate" , "nlow" ,"nstacks"]
@@ -108,3 +115,17 @@ def get_info_from_params_points(params):
         assert key in params.keys() , "No this keys, check the config file"
         outputs[key] = params[key]
     return outputs
+
+
+
+def write_coord(pred_coords , gt_coords , folder,file_name = "hg_valid_coords" ):
+    """
+    deprecated
+    Goal: write coords only in csv
+    """
+    pred_file_name = folder + file_name+"_pred.csv"
+    gt_file_name = folder +file_name + "_gt.csv"
+    print("Save VALID prediction in "+pred_file_name)
+    print("save GROUND TRUTH in " + gt_file_name)
+    np.savetxt(pred_file_name, pred_coords, delimiter=",")
+    np.savetxt(gt_file_name, gt_coords, delimiter=",")

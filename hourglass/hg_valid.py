@@ -20,7 +20,7 @@ sys.path.append(input_lib_dir)
 sys.path.append(util_lib_dir)
 import data_input
 from plumage_config import process_config
-from points_io import  write_pred_dataframe , write_coord
+from points_io import  write_pred_dataframe
 from points_metrics import *
 from seg_metrics import segs_eval
 from points_util import heatmap_to_coord,pred_coords_to_patches

@@ -1,5 +1,5 @@
 """
-TRAIN LAUNCHER 
+Grid search codes
 
 """
 
@@ -30,7 +30,7 @@ config_name = 'config_grid.cfg'
 
 params = process_config(os.path.join(dirname, config_name))
 
-
+# Find the combinations of grid search hyperparams.
 grid_params = generate_grid_params(params)
 
 print(grid_params)
@@ -55,10 +55,10 @@ if bool(grid_params):
         col_name = ""
         for key, value in zip(keys, v_pert):
             params[key] = value
-            col_name +=  "_{}_{}".format(key,value)
+            col_name +=  "{}_{}".format(key,value)
 
         print(col_name)
-        params['name'] = ori_name + col_name
+        params['name'] = ori_name + "_" + col_name
         print([params[k] for k in keys])
 
         # train process
@@ -68,18 +68,16 @@ if bool(grid_params):
         df_train = pd.read_csv(params['train_file'])
         df_valid = pd.read_csv(params['valid_file'])
 
-        # sampling the training data for faster testing.
+        #---- sampling the training data for faster testing.
         # df_train = df_train.sample(n=20,random_state=3)
         # df_valid = df_valid.sample(n=5,random_state=3)
-
-        # df=df[:1]
 
         input_data = data_input.plumage_data_input(df_train,params['batch_size'],scale = params['scale'], state = params['data_state'],
                                                  is_train=True , pre_path = params['img_folder'],is_aug=params['img_aug'] )
         print("Read valid set data: ...")
-        # df_valid = df_valid[:10]
+
         valid_data = data_input.plumage_data_input(df_valid,params['batch_size'],scale = params['scale'], state = params['data_state'],
-                                                 is_train=True , pre_path = params['img_folder'],is_aug=params['img_aug'] )
+                                                 is_train=True , pre_path = params['img_folder'],is_aug=False )
         
         epochSize = input_data.df_size // params["batch_size"]
         total_steps = (epochSize * params['nepochs']) //params["batch_size"]
@@ -107,21 +105,19 @@ if bool(grid_params):
 
         print("Output heatmaps result. Shape: "+ str(heatmaps.shape))
 
-
         df_file_names = valid_data.df[valid_data.file_name_col]
         gt_coords = valid_data.df[valid_data.coords_cols].as_matrix()
         lm_cnt = valid_data.lm_cnt
 
-
+        #---- Create the dataframe of predicted data. (centroids and created polygon patches)
         pred_coord = heatmap_to_coord(heatmaps , valid_data.img_width , valid_data.img_height)
-        patch_coord = pred_coords_to_patches(pred_coord)
-
+        #Create the polygon coords around the predicted centroids.
+        patch_coord = pred_coords_to_patches(pred_coord, half_width =10, half_height=10, ignore_coords =10)
         df_pred = write_pred_dataframe(valid_data , pred_coord , 
             params['valid_result_dir'], file_name = None , patches_coord= patch_coord )
 
-
-        ##### Accuracy test:
-                #PCK accuracy:
+        #---- Evaluate the accuracy between the dataframe of predicted data and GT data 
+        #PCK accuracy:
         diff_per_pt ,pck= pck_accuracy(pred_coord , gt_coords, lm_cnt=lm_cnt , pck_threshold = params['pck_threshold'],scale = 1)
 
 
@@ -146,7 +142,7 @@ if bool(grid_params):
         #Check whether centroids are inside patch 
         in_area = in_area_rate(pred_centroid ,gt_centroid, gt_patches)
 
-        # Check mean iou and correct prediction
+        # Check mean iou and correct prediction (precision)
 
         gt_segms = np.argmax(gt_mask, -1)
         pred_segms = np.argmax(pred_mask, -1)
@@ -162,22 +158,20 @@ if bool(grid_params):
                     'mean_pck': round(np.nanmean(pck),4),
                     'mean_diff_per_pt': round(np.nanmean(diff_per_pt),4),
                     'mean_in_poly': round(np.nanmean(in_area),4) ,
-                    'pck{}'.format(params['pck_threshold']) : pck,
+                    'pck{}'.format(params['pck_threshold']) : np.round(pck,4),
                     'diff_per_pt': diff_per_pt,
                     'in_poly': in_area,
                     'iou': iou,
-                    'precision': precision,
+                    'precision': np.round(precision,4),
                     'mean_iou': miou,
                     'mean_precision': m_precision,
                     'running time':running_time
                      }
 
         df_accuracy =pd.DataFrame(list(accuracy.items()))
-        df_accuracy = df_accuracy.set_index(0)
-        # print(accuracy)             
+        df_accuracy = df_accuracy.set_index(0)            
         # df_accuracy = pd.DataFrame.from_dict(accuracy, orient='index')      
         df_accuracy.columns = [col_name] 
-        # print(df_accuracy.iloc[:,0]) 
         df_lists.append(df_accuracy)
 pd.concat(df_lists,axis = 1).to_csv(params['valid_result_dir'] + "{}grid_search.csv".format(str(date.today())))
 

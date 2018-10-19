@@ -226,6 +226,15 @@ class plumage_data_input:
             return x_mini
 
     def get_next_batch_no_random(self):
+        """
+        Return the images and different labels 
+        in batch and in the dataframe order.
+        
+        Options:
+            Return coordiantion or patches or outline labels.
+        
+        """
+        #Augmentation is only in this next batch.
         batch_size = self.batch_size
         df_size = self.df_size
         is_train = self.is_train
@@ -256,19 +265,30 @@ class plumage_data_input:
         
 
     def get_next_batch_no_random_all(self):
+        """
+        Return the images and different labels 
+        in batch and in the dataframe order.
+        and return last batch in restshape than restart.
+        
+        Options:
+
+            Return coordiantion or patches or outline labels.
+        
+        """
         batch_size = self.batch_size
         df_size = self.df_size
         is_train = self.is_train
 
-        if self.start_idx+1>=df_size:
+        if self.start_idx >= df_size:
             self.start_idx = 0
-        
+
         if self.start_idx >= (df_size - batch_size+1):
             df_mini = self.df.iloc[self.start_idx : ]
         else: 
             df_mini = self.df.iloc[self.start_idx : self.start_idx+batch_size]
+        self.start_idx += batch_size
 
-        # print(df_mini.image_id)
+
         x_mini = self.get_x_img(df_mini)
         
         if is_train:
@@ -343,7 +363,7 @@ class plumage_data_input:
         width = int(self.img_width/scale)
         height = int(self.img_height/scale)
         
-        output_map = np.zeros((self.batch_size , height,width ,  len(cols)+1))
+        output_map = np.zeros((df.shape[0], height,width ,  len(cols)+1))
 
         # PD future warning
         # patches = df[cols].as_matrix()
@@ -370,7 +390,7 @@ class plumage_data_input:
         width = int(self.img_width/scale)
         height = int(self.img_height/scale)
         
-        output_map = np.zeros((self.batch_size , height,width ,  len(cols)+1))
+        output_map = np.zeros((df.shape[0] , height,width ,  len(cols)+1))
 
         #pd future warning
         # patches = df[cols].as_matrix()
