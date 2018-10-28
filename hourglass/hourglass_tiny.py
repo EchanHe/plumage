@@ -337,25 +337,6 @@ class HourglassModel():
             pck[j] = np.sum(per_keypoint[non_nan_mask]<pck_threshold) / per_keypoint[non_nan_mask].size
         #acc_per_row = np.mean( output_result2 , axis=0)
         return acc_per_row ,pck , output_result
-
-    def heatmap_to_coords(self, results):
-        ori_width = self.img_width * self.img_scale
-        ori_height = self.img_height * self.img_scale
-        result = results[:,self.nStack-1,:,:,:]
-        df_size = result.shape[0]
-        cnt_size = result.shape[3]
-        output_result = np.ones((df_size,cnt_size*2))
-        for i in range(df_size):
-            for j in range(cnt_size):
-                heat_map = result[i,:,:,j]
-                ori_heatmap = cv2.resize(heat_map, dsize=(ori_width, ori_height),interpolation = cv2.INTER_NEAREST)
-                map_shape = np.unravel_index(np.argmax(ori_heatmap, axis=None), ori_heatmap.shape)
-                output_result[i,j*2+0] = map_shape[1] + 1
-                output_result[i,j*2+1] = map_shape[0] + 1
-                if coord[i,j*2] ==-1:
-                    output_result[i,j*2+0] = -1
-                    output_result[i,j*2+1] = -1
-        return output_result
     
     def _train(self, nEpochs = 10, epochSize = 1000, saveStep = 500, validIter = 10):
         """
@@ -390,7 +371,7 @@ class HourglassModel():
 
                     feed_dict = {self.img_input : X_train_mini, self.gtMaps: y_stack_mini,self.visMaps: vis_stack_mini}
 
-                    if epoch ==0 and (i+1)%10 == 0:
+                    if epoch ==0 and (i+1)%100 == 0:
                         #get the time per 100 steps
                         self.time_segments.append((time.time() - epochstartTime))
 
@@ -479,39 +460,6 @@ class HourglassModel():
             print('  Final Loss: ' + str(cost) + '\n' + '  Relative Loss: ' + str(100*self.resume['loss'][-1]/(self.resume['loss'][0] + 0.1)) + '%' )
             # print('  Relative Improvement: ' + str((self.resume['err'][-1] - self.resume['err'][0]) * 100) +'%')
             print('  Training Time: ' + str( datetime.timedelta(seconds=time.time() - startTime)))
-
-    def _valid(self , pck_threshold , validation_scale):
-        #coordinate 2D coordinates
-        result_all = np.zeros((1,self.outDim  *2))
-
-        acc_list = np.zeros((1,self.outDim))
-        pck_list = np.zeros((1,self.outDim))
-        for i_df_valid in np.arange(0,self.data_stream_valid.df_size,self.batchSize):
-            X_valid_mini,_,coords_mini,_ = self.data_stream_valid.get_next_batch_no_random()
-
-            output =  self.Session.run(self.output, feed_dict =  {self.img_input : X_valid_mini})
-
-            acc,pck ,  output_coord = self.coord_accuracy_v2(output , coords_mini ,
-             pck_threshold =pck_threshold,validation_scale = validation_scale )
-
-            acc_list = np.vstack((acc_list,acc))
-            pck_list= np.vstack((pck_list,pck))
-            result_all = np.vstack((result_all,output_coord))
-
-        acc_list = acc_list[1:,:]
-        pck_list = pck_list[1:,:]
-        result_all = result_all[1:,...]
-        acc_list[acc_list==0] = np.NaN
-
-        print("VALID accu")
-        print(np.round(np.nanmean(acc_list,axis=0) , 4))
-        print(np.nanmean(acc_list))
-        print(np.nanmean(pck_list , axis=0))
-
-        #write the image into images.
-        # df_file_names = data_stream_valid.df[data_stream_valid.file_name_col]
-        # gt_coords = data_stream_valid.df[data_stream_valid.coord_cols].as_matrix()
-        return result_all
 
     def get_heatmaps(self, load):
         with tf.name_scope('Session'):
@@ -612,22 +560,7 @@ class HourglassModel():
             self._train(nEpochs, epochSize, saveStep, validIter=10)
             #self.gpu
     
-    def validing_init(self, pck_threshold = 10, validation_scale = 1,load = None):
-        #valid the accuracy of validating set
 
-        with tf.name_scope('Session'):
-            with tf.device(self.gpu):
-                self._init_weight()
-                self._define_saver_summary()
-                if load is not None:
-                    # print("Read check point file: "+load)
-                    self.saver.restore(self.Session, load)
-                    #try:
-                        #   self.saver.restore(self.Session, load)
-                    #except Exception:
-                        #   print('Loading Failed! (Check README file for further information)')
-                pred_coords = self._valid(pck_threshold , validation_scale)
-        return pred_coords
     def pred_init(self,load = None):
         #valid the accuracy of validating set
 

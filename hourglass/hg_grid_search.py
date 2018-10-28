@@ -55,7 +55,7 @@ if bool(grid_params):
         col_name = ""
         for key, value in zip(keys, v_pert):
             params[key] = value
-            col_name +=  "{}_{}".format(key,value)
+            col_name +=  "{}-{}.".format(key,value)
 
         print(col_name)
         params['name'] = ori_name + "_" + col_name
@@ -113,8 +113,12 @@ if bool(grid_params):
         pred_coord = heatmap_to_coord(heatmaps , valid_data.img_width , valid_data.img_height)
         #Create the polygon coords around the predicted centroids.
         patch_coord = pred_coords_to_patches(pred_coord, half_width =10, half_height=10, ignore_coords =10)
+        #Save the predicted dataframe to file.
         df_pred = write_pred_dataframe(valid_data , pred_coord , 
-            params['valid_result_dir'], file_name = None , patches_coord= patch_coord )
+            params['valid_result_dir']+"grid_temp/",
+             file_name = str(date.today()) + col_name,
+              patches_coord= patch_coord )
+
 
         #---- Evaluate the accuracy between the dataframe of predicted data and GT data 
         #PCK accuracy:
@@ -122,17 +126,17 @@ if bool(grid_params):
 
 
         valid_data = data_input.plumage_data_input(df_valid, df_valid.shape[0] ,scale = 10, state = 'patches',
-                                             is_train=True , pre_path = params['img_folder'],is_aug=params['img_aug'] )
+                                             is_train=True , pre_path = params['img_folder'],is_aug=False )
 
         pred_data = data_input.plumage_data_input(df_pred, df_pred.shape[0] ,scale = 10, state = 'patches',
-                                             is_train=True , pre_path = params['img_folder'],is_aug=params['img_aug'] )
+                                             is_train=True , pre_path = params['img_folder'],is_aug=False )
 
-        _, gt_mask = valid_data.get_next_batch_no_random_all()
-        _, pred_mask = pred_data.get_next_batch_no_random_all()
+        _, gt_mask = valid_data.get_next_batch_no_random_all_point_mask_without_img()
+        _, pred_mask = pred_data.get_next_batch_no_random_all_point_mask_without_img()
 
         #Inside polygon metrics
-        _, gt_centroid, _ , _ = valid_data.get_next_batch_no_random_all_labels()
-        _, pred_centroid, _ , _ = pred_data.get_next_batch_no_random_all_labels()
+        gt_centroid, _ , _ = valid_data.get_next_batch_no_random_all_labels_without_img()
+        pred_centroid, _ , _ = pred_data.get_next_batch_no_random_all_labels_without_img()
 
         #Only use the centroids of polygons
         pred_centroid = pred_centroid[:,10:]
@@ -174,6 +178,14 @@ if bool(grid_params):
         df_accuracy.columns = [col_name] 
         df_lists.append(df_accuracy)
 pd.concat(df_lists,axis = 1).to_csv(params['valid_result_dir'] + "{}grid_search.csv".format(str(date.today())))
+
+
+
+
+# tf.reset_default_graph()
+# gc.collect()
+# input("Press Enter to continue...")
+
 
 
 #generate the dictionary for grid search

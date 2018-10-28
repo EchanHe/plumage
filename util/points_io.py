@@ -31,7 +31,7 @@ patches_cols = ['poly.crown', 'poly.nape','poly.mantle', 'poly.rump', 'poly.tail
      'poly.wing.coverts',   'poly.wing.primaries.secondaries']
 
      
-def write_pred_dataframe(valid_data , pred_coord , folder,file_name , patches_coord=None ):
+def write_pred_dataframe(valid_data , pred_coord , folder,file_name , patches_coord=None, write_index = False ):
     """
     Goal: write prediction coordinates to DATAFRAME csv and return the panda dataframe
 
@@ -60,7 +60,7 @@ def write_pred_dataframe(valid_data , pred_coord , folder,file_name , patches_co
     result.loc[result['view']=='side', no_side_cols]=-1
 
     if file_name is not None:
-        result.to_csv(folder+file_name+".csv" , index =False)
+        result.to_csv(folder+file_name+".csv" , index =write_index)
     return result
 
 ### Goal: write the evaluation on json

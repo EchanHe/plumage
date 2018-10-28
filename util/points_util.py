@@ -17,9 +17,11 @@ def heatmap_to_coord(heatmaps , ori_width , ori_height):
 # Goals: transfer the coords into a rectangle coords
 
 #return a matrix of rectangle x,y strings in [batch, n_patches]
-def pred_coords_to_patches(pred_coords , half_width =10, half_height=10 , total_patches =11 , ignore_coords =10):
+def pred_coords_to_patches(pred_coords , half_width =10, half_height=10 , ignore_coords =10):
 
     pred_coords = pred_coords[:,ignore_coords:]
+
+    total_patches = pred_coords.shape[-1]//2
     x_coords = pred_coords[:,range(0,total_patches*2,2)]
     y_coords = pred_coords[:,range(1,total_patches*2,2)]
 
@@ -28,8 +30,6 @@ def pred_coords_to_patches(pred_coords , half_width =10, half_height=10 , total_
     lower_x_coords = x_coords - half_width
     lower_y_coords = y_coords - half_height
 
-
-    print(x_coords.shape, y_coords.shape)
     pred_patches = np.empty((pred_coords.shape[0] , total_patches) , dtype = object)
 
     # [pred_coords+4000 , pred_coords-4000 ]

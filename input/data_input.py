@@ -313,7 +313,7 @@ class plumage_data_input:
         df_size = self.df_size
         is_train = self.is_train
 
-        if self.start_idx+1>=df_size:
+        if self.start_idx>=df_size:
             self.start_idx = 0
         if self.start_idx >= (df_size - batch_size+1):
             df_mini = self.df.iloc[self.start_idx : ]
@@ -326,7 +326,41 @@ class plumage_data_input:
         self.start_idx += batch_size
         return x_mini, coords_mini , p_coords_mini, c_coords_mini
         
-        
+    def get_next_batch_no_random_all_labels_without_img(self):
+        batch_size = self.batch_size
+        df_size = self.df_size
+        is_train = self.is_train
+
+        if self.start_idx+1>=df_size:
+            self.start_idx = 0
+        if self.start_idx >= (df_size - batch_size+1):
+            df_mini = self.df.iloc[self.start_idx : ]
+        else: 
+            df_mini = self.df.iloc[self.start_idx : self.start_idx+batch_size]
+
+        coords_mini = self.get_y_coord(df_mini , self.scale , True)
+        p_coords_mini = self.get_contour_patches_coords(df_mini , mode = 'patches' )
+        c_coords_mini = self.get_contour_patches_coords(df_mini , mode = 'contour')
+        self.start_idx += batch_size
+        return coords_mini , p_coords_mini, c_coords_mini
+    
+    def get_next_batch_no_random_all_point_mask_without_img(self):
+        batch_size = self.batch_size
+        df_size = self.df_size
+        is_train = self.is_train
+
+        if self.start_idx+1>=df_size:
+            self.start_idx = 0
+        if self.start_idx >= (df_size - batch_size+1):
+            df_mini = self.df.iloc[self.start_idx : ]
+        else: 
+            df_mini = self.df.iloc[self.start_idx : self.start_idx+batch_size]
+
+        coords_mini = self.get_y_coord(df_mini , self.scale , True)
+        p_coords_mini = self.get_y_patches(df_mini)
+
+        self.start_idx += batch_size
+        return coords_mini , p_coords_mini  
     ######get data#############
     
     #Get image in [batch,width,height,3]
