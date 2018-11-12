@@ -55,7 +55,7 @@ if bool(grid_params):
         col_name = ""
         for key, value in zip(keys, v_pert):
             params[key] = value
-            col_name +=  "{}-{}.".format(key,value)
+            col_name +=  "{}-{};".format(key,value)
 
         print(col_name)
         params['name'] = ori_name + "_" + col_name
@@ -106,7 +106,7 @@ if bool(grid_params):
         print("Output heatmaps result. Shape: "+ str(heatmaps.shape))
 
         df_file_names = valid_data.df[valid_data.file_name_col]
-        gt_coords = valid_data.df[valid_data.coords_cols].as_matrix()
+        gt_coords = valid_data.df[valid_data.coords_cols].values
         lm_cnt = valid_data.lm_cnt
 
         #---- Create the dataframe of predicted data. (centroids and created polygon patches)
