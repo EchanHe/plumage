@@ -41,7 +41,7 @@ class HourglassModel():
     Generate TensorFlow model to train and predict Human Pose from images (soon videos)
     Please check README.txt for further information on model management.
     """
-    def __init__(self, img_width=256,img_height=256 , img_scale = 20, nFeat = 512, nStack = 4, nModules = 1, nLow = 4, outputDim = 16, 
+    def __init__(self, img_width=256,img_height=256 , img_scale = 20, nFeat = 512, nStack = 4, nModules = 1, nLow = 4,output_stride=4, outputDim = 16, 
         batch_size = 16, drop_rate = 0.2, lear_rate = 2.5e-4, decay = 0.96, decay_step = 2000, is_grey = False,
          data_stream_train = None,data_stream_valid = None,data_stream_test=None, training = True, 
      w_summary = True,logdir_train = None, logdir_test = None , saver_directory = None,
@@ -91,9 +91,10 @@ class HourglassModel():
         self.saver_directory = saver_directory
         self.joints = joints
         self.w_loss = w_loss
-        
-        self.output_width =int(self.img_width/self.nLow)
-        self.output_height =int(self.img_height/self.nLow)
+        self.output_stride = output_stride
+
+        self.output_width =int(self.img_width/self.output_stride)
+        self.output_height =int(self.img_height/self.output_stride)
 
         self.data_stream_train = data_stream_train
         self.data_stream_valid = data_stream_valid
@@ -182,6 +183,8 @@ class HourglassModel():
         graphTime = time.time()
         print('---Graph : Done (' + str(int(abs(graphTime-inputTime))) + ' sec.)')
         with tf.name_scope('loss'):
+            # print("OUTPUT SHAPE:", self.output.shape)
+            # print("OUTPUT SHAPE:", self.visMaps.shape)
             if self.w_loss:
                 self.loss = tf.reduce_mean(self.weighted_bce_loss(), name='reduced_loss')
             else:

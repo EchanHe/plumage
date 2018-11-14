@@ -102,6 +102,7 @@ class plumage_data_input:
     patches_cols = ['poly.crown' , 'poly.nape','poly.mantle', 'poly.rump', 'poly.tail',
     'poly.throat', 'poly.breast', 'poly.belly', 'poly.tail.underside',
      'poly.wing.coverts',   'poly.wing.primaries.secondaries']
+     
     coords_cols = ['s02.standard_x', 's02.standard_y', 's20.standard_x', 's20.standard_y',
        's40.standard_x', 's40.standard_y', 's80.standard_x', 's80.standard_y',
        's99.standard_x', 's99.standard_y','crown_x', 'crown_y', 'nape_x',
@@ -118,7 +119,8 @@ class plumage_data_input:
     STATE_OPTIONS = ['coords', 'contour', 'patches']
     
     #---basic config ---
-    def __init__(self,df,batch_size,is_train,pre_path, state,scale=1 ,is_aug = True):
+    def __init__(self,df,batch_size,is_train,pre_path, state,
+        scale=1 ,is_aug = True , heatmap_scale = 4):
         """
         init function for the data
         
@@ -136,6 +138,7 @@ class plumage_data_input:
         self.df  = df
         self.pre_path = pre_path
         self.scale = scale
+        self.heatmap_scale = heatmap_scale
         self.df_size = df.shape[0]
         self.batch_size = batch_size
         self.is_train = is_train
@@ -155,8 +158,8 @@ class plumage_data_input:
         self.img_height = img.shape[0]
 
         print("Init data class...")
-        print("\tData shape: {}\n\tbatch_size:{}\n\tImage resolution: {}*{}\n\tImage Augmentation:{}"\
-            .format(self.df_size, self.batch_size ,self.img_width , self.img_height, self.is_aug))
+        print("\tData shape: {}\n\tbatch_size:{}\n\tscale:{}\n\tImage resolution: {}*{}\n\tImage Augmentation:{}"\
+            .format(self.df_size, self.batch_size,self.scale ,self.img_width , self.img_height, self.is_aug))
         print("Augmentation option:" , self.aug_option)
         
         self.all_columns = df.columns
@@ -528,7 +531,7 @@ class plumage_data_input:
 
         df_size = y_coord.shape[0]
 
-        real_scale = self.scale * 4
+        real_scale = self.scale * self.heatmap_scale
         scaled_width = int(self.img_width/real_scale)
         scaled_height = int(self.img_height/real_scale)
 
@@ -608,7 +611,7 @@ class plumage_data_input:
         df_size = y_coord.shape[0]
 
 
-        real_scale = self.scale * 4
+        real_scale = self.scale * self.heatmap_scale
         scaled_width = int(self.img_width/real_scale)
         scaled_height = int(self.img_height/real_scale)
 

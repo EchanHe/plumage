@@ -42,6 +42,7 @@ def write_pred_dataframe(valid_data , pred_coord , folder,file_name , patches_co
         file_name: name of the csv file. When is None, function doesn't save the csv
         patches_coord: lists of coodinates for each patch. [batch_size, n patches] (dtype = list)
     """
+    # Get the name and view from Valid data
     df_file_names = valid_data.df[['file.vis', 'view']]
     df_file_names = df_file_names.reset_index()
     result = pd.DataFrame(pred_coord, columns = valid_data.coords_cols )
@@ -49,11 +50,13 @@ def write_pred_dataframe(valid_data , pred_coord , folder,file_name , patches_co
         os.makedirs(folder)
 
 
+    # Write the polygons in if there is given patches_coord
+    # Other wise assign all -1.
     if patches_coord is None:
-        result = pd.concat([df_file_names,result],axis=1)
-    else:
-        p_result = pd.DataFrame(patches_coord, columns = patches_cols)
-        result = pd.concat([df_file_names,result,p_result],axis=1)
+        patches_coord = np.ones((result.shape[0], len(valid_data.patches_cols))) * -1
+    
+    p_result = pd.DataFrame(patches_coord, columns = valid_data.patches_cols)
+    result = pd.concat([df_file_names,result,p_result],axis=1)
 
     result.loc[result['view']=='back', no_back_cols]=-1
     result.loc[result['view']=='belly', no_belly_cols]=-1
@@ -129,3 +132,6 @@ def write_coord(pred_coords , gt_coords , folder,file_name = "hg_valid_coords" )
     print("save GROUND TRUTH in " + gt_file_name)
     np.savetxt(pred_file_name, pred_coords, delimiter=",")
     np.savetxt(gt_file_name, gt_coords, delimiter=",")
+
+
+
