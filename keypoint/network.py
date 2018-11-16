@@ -12,6 +12,9 @@ class CPM:
         self.global_step = tf.get_variable("global_step", initializer=0,
                     dtype=tf.int32, trainable=False)
         self.start_learning_rate =config["learning_rate"]
+        self.decay_step = config["decay_step"]
+        self.learning_rate_decay = config["learning_rate_decay"]
+
         self.lambda_l2 = config["l2"]
 
         self.batch_size = config["batch_size"]
@@ -93,7 +96,7 @@ class CPM:
         self._loss_summary(total_loss)
 
         self.learning_rate = tf.train.exponential_decay(self.start_learning_rate, global_step,
-                                                   5000, 0.5, staircase=True)
+                                                   self.decay_step, self.learning_rate_decay, staircase=True)
 
         optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
         grads = optimizer.compute_gradients(total_loss)
