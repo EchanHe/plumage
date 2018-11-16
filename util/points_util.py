@@ -1,7 +1,20 @@
 import numpy as np
 import cv2
-# Goals: transfer heatmaps to the size given
+
 def heatmap_to_coord(heatmaps , ori_width , ori_height):
+    """
+    # Goals: transfer heatmaps to the size given
+
+    Params:
+        heatmaps: heatmaps from pose esitmation method, 
+            Shape(df_size, heatmap_height,heatmap_width, heatmap channel)
+        ori_width: The width you want to transfer back
+        ori_height: The height you want to transfer back
+
+    return:
+        The coordinates found on heatmap, eg [x1,y1,x2,y2,...,xn,yn]
+        Shape: (df_size,cnt_size*2)
+    """
     df_size = heatmaps.shape[0]
     cnt_size = heatmaps.shape[3]
     output_result = np.ones((df_size,cnt_size*2))

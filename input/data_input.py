@@ -102,7 +102,7 @@ class plumage_data_input:
     patches_cols = ['poly.crown' , 'poly.nape','poly.mantle', 'poly.rump', 'poly.tail',
     'poly.throat', 'poly.breast', 'poly.belly', 'poly.tail.underside',
      'poly.wing.coverts',   'poly.wing.primaries.secondaries']
-     
+
     coords_cols = ['s02.standard_x', 's02.standard_y', 's20.standard_x', 's20.standard_y',
        's40.standard_x', 's40.standard_y', 's80.standard_x', 's80.standard_y',
        's99.standard_x', 's99.standard_y','crown_x', 'crown_y', 'nape_x',
@@ -232,6 +232,9 @@ class plumage_data_input:
         """
         Return the images and different labels 
         in batch and in the dataframe order.
+
+        If the index slice reach the end, wrap the slice.
+        e.g. total length 10. [8:12] [8,9,0,1] 
         
         Options:
             Return coordiantion or patches or outline labels.
@@ -242,12 +245,15 @@ class plumage_data_input:
         df_size = self.df_size
         is_train = self.is_train
 
-        
-        if self.start_idx >= (df_size - batch_size+1):
+        # Index part
+        int_index = np.arange(df_size)
+        if self.start_idx >= df_size:
             self.start_idx = 0 
-        df_mini = self.df.iloc[self.start_idx : self.start_idx+batch_size]
+        # Wrap the index and use iloc on the wrapped index.
+        wrapped_index = int_index.take(range(self.start_idx, self.start_idx+batch_size), axis = 0, mode = 'wrap')
+        df_mini = self.df.iloc[wrapped_index,:]
         self.start_idx += batch_size
-        # print(df_mini.image_id)
+
         x_mini = self.get_x_img(df_mini)
         
         if is_train:

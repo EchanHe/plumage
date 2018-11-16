@@ -26,9 +26,6 @@ no_side_cols = ['crown_x', 'crown_y', 'nape_x',
        'poly.crown', 'poly.nape','poly.mantle', 'poly.rump', 'poly.tail',
        'poly.throat', 'poly.breast', 'poly.belly', 'poly.tail.underside']
 
-patches_cols = ['poly.crown', 'poly.nape','poly.mantle', 'poly.rump', 'poly.tail',
-     'poly.throat', 'poly.breast', 'poly.belly', 'poly.tail.underside',
-     'poly.wing.coverts',   'poly.wing.primaries.secondaries']
 
      
 def write_pred_dataframe(valid_data , pred_coord , folder,file_name , patches_coord=None, write_index = False ):
@@ -44,7 +41,7 @@ def write_pred_dataframe(valid_data , pred_coord , folder,file_name , patches_co
     """
     # Get the name and view from Valid data
     df_file_names = valid_data.df[['file.vis', 'view']]
-    df_file_names = df_file_names.reset_index()
+    df_file_names = df_file_names.reset_index(drop=True)
     result = pd.DataFrame(pred_coord, columns = valid_data.coords_cols )
     if not os.path.exists(folder):
         os.makedirs(folder)
