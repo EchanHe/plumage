@@ -83,7 +83,7 @@ with tf.Session() as sess:
     for start_id in range(0, pred_data.df.shape[0], pred_data.batch_size):
         #Generate heatmaps by batchs, so the memory won't overflow.
         img_mini = pred_data.get_next_batch_no_random()
-        feed_dict = {model.pred_images: img_mini}
+        feed_dict = {model.images: img_mini}
         predict_mini = sess.run(predict, feed_dict=feed_dict)
         pred_coord_mini = heatmap_to_coord(predict_mini , pred_data.img_width , pred_data.img_height)
 

@@ -8,14 +8,18 @@ class CPM:
         Initialize the model with config and its hyperparameters
         """
         self.is_train = config['is_train']
+        self.is_grey = config['is_grey']
+        self.network_name = config['network_name']
+
         self.cpu = '/cpu:0'     
         self.global_step = tf.get_variable("global_step", initializer=0,
                     dtype=tf.int32, trainable=False)
-        self.start_learning_rate =config["learning_rate"]
-        self.decay_step = config["decay_step"]
-        self.learning_rate_decay = config["learning_rate_decay"]
 
-        self.lambda_l2 = config["l2"]
+        if self.is_train is True:
+            self.start_learning_rate =config["learning_rate"]
+            self.decay_step = config["decay_step"]
+            self.learning_rate_decay = config["learning_rate_decay"]
+            self.lambda_l2 = config["l2"]
 
         self.batch_size = config["batch_size"]
 
@@ -57,7 +61,7 @@ class CPM:
 
         self.point_names = config['point_names']
 
-        self.network_name = config['network_name']
+        
         print("Initialize the {} network.\n\tIs Training:{}\n\tInput shape: {}\n\tOutput shape: {}".format(self.network_name,
             self.is_train, self.images.shape.as_list(), self.labels.shape.as_list()))
     def loss(self):
@@ -186,10 +190,14 @@ class CPM:
 
         # center_map = self.center_map
         lm_cnt = self.points_num
-        if self.is_train:
-            image = self.images
-        else:
-            image = self.pred_images
+        # if self.is_train:
+        #     image = self.images
+        # else:
+        #     image = self.pred_images
+        if self.is_grey is True:
+            self.images = tf.image.rgb_to_grayscale(self.images)
+
+        image = self.images
         with tf.variable_scope('PoseNet'):
             # pool_center_lower = layers.avg_pool2d(center_map, 9, 8, padding='SAME')
             conv1_1 = layers.conv2d(image, 64, 3, 1, activation_fn=None, scope='conv1_1')
@@ -321,10 +329,15 @@ class CPM:
         # center_map = self.center_map
         is_train = self.is_train
         lm_cnt = self.points_num
-        if is_train:
-            image = self.images
-        else:
-            image = self.pred_images
+        # if is_train:
+        #     image = self.images
+        # else:
+        #     image = self.pred_images
+
+        if self.is_grey is True:
+            self.images = tf.image.rgb_to_grayscale(self.images)
+
+        image = self.images
         with tf.variable_scope('PoseNet'):
             # print("lambda : {} keep prob: {} ".format(self.lambda_l2 , self.keep_prob))
             regularizer = tf.contrib.layers.l2_regularizer(scale=0.0005)
