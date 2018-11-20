@@ -40,9 +40,10 @@ def generate_grid_params(params):
     Return a dictionary with {Name: value parameters}
     """
     # The keys can be used as grid search.
-    keys = ['scale' , 'is_grey' ,
-     'nstacks',
-     'learning_rate', 'batch_size','dropout_rate' , 'img_aug', 'nlow']
+    keys = ['scale' , 'is_grey' , , 'img_aug'
+        'learning_rate','learning_rate_decay', 'decay_step',
+        'batch_size', 'l2','dropout_rate', 
+        'nlow','nstacks','output_stride']
     grid_params = {}
 
     for key in keys:

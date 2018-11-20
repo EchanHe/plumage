@@ -1,6 +1,6 @@
 import tensorflow as tf
 import tensorflow.contrib.layers as layers
-
+import numpy as np
 
 class CPM:
     def __init__(self , config,ori_img_width, ori_img_height):
@@ -27,13 +27,12 @@ class CPM:
         self.params_dir = config["saver_directory"]
 
         self.scale = config['scale']
+        self.output_stride = config['output_stride']
         self.img_height = ori_img_height // self.scale
         self.img_width = ori_img_width // self.scale
-        # self.fm_height = config.fm_height
-        # self.fm_width = config.fm_width
 
-        self.fm_height = self.img_height//8 #= int(config.img_height/8-1)
-        self.fm_width = self.img_width//8 #int(config.img_width/8-1)
+        self.fm_height = self.img_height//self.output_stride
+        self.fm_width = self.img_width//self.output_stride 
 
         self.images = tf.placeholder(
                 dtype = tf.float32,
@@ -60,13 +59,21 @@ class CPM:
         self.dropout_rate = config['dropout_rate']
 
         self.point_names = config['point_names']
+        self.nFeat = config['nfeats']
+        if self.network_name == 'hourglass':
+            self.nStack = _help_func_dict(config, 'nstacks')
+            self.nLow = _help_func_dict(config, 'nlow')
+            self.tiny = _help_func_dict(config, 'tiny')
+            self.w_summary  =False
+            self.modif = True
 
-        
         print("Initialize the {} network.\n\tIs Training:{}\n\tInput shape: {}\n\tOutput shape: {}".format(self.network_name,
             self.is_train, self.images.shape.as_list(), self.labels.shape.as_list()))
+    
+################### functions ##########
     def loss(self):
         """
-        损失函数  
+        Loss function of all losses  
         """
         
         return tf.add( tf.add_n(tf.get_collection('losses')) , 
@@ -75,7 +82,7 @@ class CPM:
     
     def add_to_euclidean_loss(self, batch_size, predicts, labels, name):
         """
-        将每一stage的最后一层加入损失函数 
+        Euclidean loss of between predictions and labels.
         """
 
         flatten_vis = tf.reshape(self.vis_mask, [batch_size, -1])
@@ -347,6 +354,7 @@ class CPM:
             conv1_2 = layers.conv2d(conv1_1, 64, 3, 1, weights_regularizer=regularizer,activation_fn=None, scope='conv1_2')
             conv1_2 = tf.nn.relu(conv1_2)
             # return conv1_2
+            # Pool
             pool1_stage1 = layers.max_pool2d(conv1_2, 2, 2)
             conv2_1 = layers.conv2d(pool1_stage1, 128, 3, 1,weights_regularizer=regularizer, activation_fn=None, scope='conv2_1')
             conv2_1 = tf.nn.relu(conv2_1)
@@ -366,7 +374,25 @@ class CPM:
             conv4_1 = tf.nn.relu(conv4_1)
             conv4_2 = layers.conv2d(conv4_1, 512, 3, 1,weights_regularizer=regularizer, activation_fn=None, scope='conv4_2')
             conv4_2 = tf.nn.relu(conv4_2)
-            conv4_3_CPM = layers.conv2d(conv4_2, 256, 3, 1, activation_fn=None, scope='conv4_3_CPM')
+            ### add for different receptive field.
+            conv4_3 = layers.conv2d(conv4_2, 512, 3, 1,weights_regularizer=regularizer, activation_fn=None, scope='conv4_3')
+            conv4_3 = tf.nn.relu(conv4_3) 
+            
+            if self.output_stride ==16:
+                pool4_stage1 = layers.max_pool2d(conv4_3, 2, 2)
+               
+                conv5_1 = layers.conv2d(pool4_stage1, 512, 3, 1,weights_regularizer=regularizer, activation_fn=None, scope='conv5_1')
+                conv5_1 = tf.nn.relu(conv5_1)
+                conv5_2 = layers.conv2d(conv5_1, 512, 3, 1,weights_regularizer=regularizer, activation_fn=None, scope='conv5_2')
+                conv5_2 = tf.nn.relu(conv5_2)
+                conv5_3 = layers.conv2d(conv5_2, 512, 3, 1,weights_regularizer=regularizer, activation_fn=None, scope='conv5_3')
+                conv5_3 = tf.nn.relu(conv5_3) 
+               
+                conv4_3_CPM = layers.conv2d(conv5_3, 256, 3, 1, activation_fn=None, scope='conv4_3_CPM')
+            else:
+                conv4_3_CPM = layers.conv2d(conv4_3, 256, 3, 1, activation_fn=None, scope='conv4_3_CPM')
+
+            # conv4_3_CPM = layers.conv2d(conv4_2, 256, 3, 1, activation_fn=None, scope='conv4_3_CPM')
             conv4_3_CPM = tf.nn.relu(conv4_3_CPM)
             conv4_4_CPM = layers.conv2d(conv4_3_CPM, 256, 3, 1,weights_regularizer=regularizer, activation_fn=None, scope='conv4_4_CPM')
             conv4_4_CPM = tf.nn.relu(conv4_4_CPM)
@@ -486,3 +512,294 @@ class CPM:
         # self.add_to_accuracy(Mconv7_stage6)
         self._create_summary(Mconv7_stage6)
         return Mconv7_stage6
+
+################### Stacked hourglass#####################
+
+    def add_loss_stacked_hourglass(self, predicts):
+        """
+        Goal Add losses between predictions and labels
+
+        params:
+            predict shape: (batch, nStack, height, width, channel)
+        self.labels shape: (batch, height, width, channel)
+        self.vis_mask shape: (batch, height, width, channel)
+        """
+        stacked_visMaps = tf.stack([self.vis_mask] * self.nStack, axis = 1, name = "stacked_visMaps")
+        stacked_labels = tf.stack([self.labels] * self.nStack, axis = 1, name = "stacked_labels")
+
+        output_mask = tf.multiply(predicts , stacked_visMaps)
+        # self.gtMaps_mask = tf.multiply(self.gtMaps , self.visMaps)
+
+
+        with tf.name_scope("hourglass") as scope:
+            loss = tf.reduce_mean(tf.square(tf.subtract(output_mask , stacked_labels)))
+
+
+        tf.add_to_collection("losses", loss)
+    def hourglass(self):
+        """Create the Network
+        Args:
+            inputs : TF Tensor (placeholder) of shape (None, 256, 256, 3) #TODO : Create a parameter for customize size
+        """
+
+        if self.is_grey is True:
+            self.images = tf.image.rgb_to_grayscale(self.images)
+
+        images = self.images
+        with tf.name_scope('model'):
+            with tf.name_scope('preprocessing'):
+                # Input Dim : nbImages x 256 x 256 x 3
+                pad1 = tf.pad(images, [[0,0],[2,2],[2,2],[0,0]], name='pad_1')
+                # Dim pad1 : nbImages x 260 x 260 x 3
+                conv1 = self._conv_bn_relu(pad1, filters= 64, kernel_size = 6, strides = 2, name = 'conv_256_to_128')
+                # Dim conv1 : nbImages x 128 x 128 x 64
+                r1 = self._residual(conv1, numOut = 128, name = 'r1')
+                # Dim pad1 : nbImages x 128 x 128 x 128
+                pool1 = tf.contrib.layers.max_pool2d(r1, [2,2], [2,2], padding='VALID')
+                # Dim pool1 : nbImages x 64 x 64 x 128
+                if self.tiny:
+                    r3 = self._residual(pool1, numOut=self.nFeat, name='r3')
+                else:
+                    r2 = self._residual(pool1, numOut= int(self.nFeat/2), name = 'r2')
+                    r3 = self._residual(r2, numOut= self.nFeat, name = 'r3')
+            # Storage Table
+            hg = [None] * self.nStack
+            ll = [None] * self.nStack
+            ll_ = [None] * self.nStack
+            drop = [None] * self.nStack
+            out = [None] * self.nStack
+            out_ = [None] * self.nStack
+            sum_ = [None] * self.nStack
+            if self.tiny:
+                with tf.name_scope('stacks'):
+                    with tf.name_scope('stage_0'):
+                        hg[0] = self._hourglass(r3, self.nLow, self.nFeat, 'hourglass')
+
+                        drop[0] = tf.layers.dropout(hg[0], rate = self.dropout_rate, training = self.is_train, name = 'dropout')
+                        ll[0] = self._conv_bn_relu(drop[0], self.nFeat, 1, 1, name = 'll')
+                        if self.modif:
+                            # TEST OF BATCH RELU
+                            out[0] = self._conv_bn_relu(ll[0], self.points_num, 1, 1, 'VALID', 'out')
+                        else:
+                            out[0] = self._conv(ll[0], self.points_num, 1, 1, 'VALID', 'out')
+                        out_[0] = self._conv(out[0], self.nFeat, 1, 1, 'VALID', 'out_')
+                        sum_[0] = tf.add_n([out_[0], ll[0], r3], name = 'merge')
+                    for i in range(1, self.nStack - 1):
+                        with tf.name_scope('stage_' + str(i)):
+                            hg[i] = self._hourglass(sum_[i-1], self.nLow, self.nFeat, 'hourglass')
+                            drop[i] = tf.layers.dropout(hg[i], rate = self.dropout_rate, training = self.is_train, name = 'dropout')
+                            ll[i] = self._conv_bn_relu(drop[i], self.nFeat, 1, 1, name= 'll')
+                            if self.modif:
+                                # TEST OF BATCH RELU
+                                out[i] = self._conv_bn_relu(ll[i], self.points_num, 1, 1, 'VALID', 'out')
+                            else:
+                                out[i] = self._conv(ll[i], self.points_num, 1, 1, 'VALID', 'out')
+                            out_[i] = self._conv(out[i], self.nFeat, 1, 1, 'VALID', 'out_')
+                            sum_[i] = tf.add_n([out_[i], ll[i], sum_[i-1]], name= 'merge')
+                    with tf.name_scope('stage_' + str(self.nStack - 1)):
+                        hg[self.nStack - 1] = self._hourglass(sum_[self.nStack - 2], self.nLow, self.nFeat, 'hourglass')
+                        drop[self.nStack-1] = tf.layers.dropout(hg[self.nStack-1], rate = self.dropout_rate, training = self.is_train, name = 'dropout')
+                        ll[self.nStack - 1] = self._conv_bn_relu(drop[self.nStack-1], self.nFeat,1,1, 'VALID', 'conv')
+                        if self.modif:
+                            out[self.nStack - 1] = self._conv_bn_relu(ll[self.nStack - 1], self.points_num, 1,1, 'VALID', 'out')
+                        else:
+                            out[self.nStack - 1] = self._conv(ll[self.nStack - 1], self.points_num, 1,1, 'VALID', 'out')
+                if self.modif:
+                    return tf.nn.sigmoid(tf.stack(out, axis= 1 , name= 'stack_output'),name = 'final_output')
+                else:
+                    return tf.stack(out, axis= 1 , name = 'final_output')   
+            else:
+                with tf.name_scope('stacks'):
+                    with tf.name_scope('stage_0'):
+                        # print(r3.shape)
+                        hg[0] = self._hourglass(r3, self.nLow, self.nFeat, 'hourglass')
+                        # print("hr_glass 1")
+                        # print(hg[0])
+                        drop[0] = tf.layers.dropout(hg[0], rate = self.dropout_rate, training = self.is_train, name = 'dropout')
+                        ll[0] = self._conv_bn_relu(drop[0], self.nFeat, 1,1, 'VALID', name = 'conv')
+                        ll_[0] =  self._conv(ll[0], self.nFeat, 1, 1, 'VALID', 'll')
+                        # print(ll_[0])
+                        if self.modif:
+                            # TEST OF BATCH RELU
+                            out[0] = self._conv_bn_relu(ll[0], self.points_num, 1, 1, 'VALID', 'out')
+                        else:
+                            out[0] = self._conv(ll[0], self.points_num, 1, 1, 'VALID', 'out')
+                        #Yichen:Add result to out and sum array.
+                        out_[0] = self._conv(out[0], self.nFeat, 1, 1, 'VALID', 'out_')
+
+                        sum_[0] = tf.add_n([out_[0], r3, ll_[0]], name='merge')
+                    
+                    # Yichen : In the middle    
+                    for i in range(1, self.nStack -1):
+                        with tf.name_scope('stage_' + str(i)):
+                            hg[i] = self._hourglass(sum_[i-1], self.nLow, self.nFeat, 'hourglass')
+                            drop[i] = tf.layers.dropout(hg[i], rate = self.dropout_rate, training = self.is_train, name = 'dropout')
+                            ll[i] = self._conv_bn_relu(drop[i], self.nFeat, 1, 1, 'VALID', name= 'conv')
+                            ll_[i] = self._conv(ll[i], self.nFeat, 1, 1, 'VALID', 'll')
+                            if self.modif:
+                                out[i] = self._conv_bn_relu(ll[i], self.points_num, 1, 1, 'VALID', 'out')
+                            else:
+                                out[i] = self._conv(ll[i], self.points_num, 1, 1, 'VALID', 'out')
+                            out_[i] = self._conv(out[i], self.nFeat, 1, 1, 'VALID', 'out_')
+                            sum_[i] = tf.add_n([out_[i], sum_[i-1], ll_[0]], name= 'merge')
+
+                    with tf.name_scope('stage_' + str(self.nStack -1)):
+                        hg[self.nStack - 1] = self._hourglass(sum_[self.nStack - 2], self.nLow, self.nFeat, 'hourglass')
+                        drop[self.nStack-1] = tf.layers.dropout(hg[self.nStack-1], rate = self.dropout_rate, training = self.is_train, name = 'dropout')
+                        ll[self.nStack - 1] = self._conv_bn_relu(drop[self.nStack-1], self.nFeat, 1, 1, 'VALID', 'conv')
+                        if self.modif:
+                            out[self.nStack - 1] = self._conv_bn_relu(ll[self.nStack - 1], self.points_num, 1,1, 'VALID', 'out')
+                        else:
+                            out[self.nStack - 1] = self._conv(ll[self.nStack - 1], self.points_num, 1,1, 'VALID', 'out')
+                if self.modif:
+                    #add losses and return the prediction.
+                    predicts = tf.nn.sigmoid(tf.stack(out, axis= 1 , name= 'stack_output'),name = 'final_output')
+                else:
+                    predicts = tf.stack(out, axis= 1 , name = 'final_output')
+                self.add_loss_stacked_hourglass(predicts)
+
+                self._create_summary(predicts[:,self.nStack-1,...])
+                return predicts[:,self.nStack-1,...]
+
+                    
+    def _conv(self, inputs, filters, kernel_size = 1, strides = 1, pad = 'VALID', name = 'conv'):
+        """ Spatial Convolution (CONV2D)
+        Args:
+            inputs          : Input Tensor (Data Type : NHWC)
+            filters     : Number of filters (channels)
+            kernel_size : Size of kernel
+            strides     : Stride
+            pad             : Padding Type (VALID/SAME) # DO NOT USE 'SAME' NETWORK BUILT FOR VALID
+            name            : Name of the block
+        Returns:
+            conv            : Output Tensor (Convolved Input)
+        """
+        with tf.name_scope(name):
+            # Kernel for convolution, Xavier Initialisation
+            kernel = tf.Variable(tf.contrib.layers.xavier_initializer(uniform=False)([kernel_size,kernel_size, inputs.get_shape().as_list()[3], filters]), name= 'weights')
+            conv = tf.nn.conv2d(inputs, kernel, [1,strides,strides,1], padding=pad, data_format='NHWC')
+            if self.w_summary:
+                with tf.device('/cpu:0'):
+                    tf.summary.histogram('weights_summary', kernel, collections = ['weight'])
+            return conv            
+
+    def _conv_bn_relu(self, inputs, filters, kernel_size = 1, strides = 1, pad = 'VALID', name = 'conv_bn_relu'):
+        """ Spatial Convolution (CONV2D) + BatchNormalization + ReLU Activation
+        Args:
+            inputs          : Input Tensor (Data Type : NHWC)
+            filters     : Number of filters (channels)
+            kernel_size : Size of kernel
+            strides     : Stride
+            pad             : Padding Type (VALID/SAME) # DO NOT USE 'SAME' NETWORK BUILT FOR VALID
+            name            : Name of the block
+        Returns:
+            norm            : Output Tensor
+        """
+        with tf.name_scope(name):
+            kernel = tf.Variable(tf.contrib.layers.xavier_initializer(uniform=False)([kernel_size,kernel_size, inputs.get_shape().as_list()[3], filters]), name= 'weights')
+            conv = tf.nn.conv2d(inputs, kernel, [1,strides,strides,1], padding='VALID', data_format='NHWC')
+            norm = tf.contrib.layers.batch_norm(conv, 0.9, epsilon=1e-5, activation_fn = tf.nn.relu, is_training = self.is_train)
+            if self.w_summary:
+                with tf.device('/cpu:0'):
+                    tf.summary.histogram('weights_summary', kernel, collections = ['weight'])
+            return norm
+
+    def _conv_block(self, inputs, numOut, name = 'conv_block'):
+        """ Convolutional Block
+        Args:
+            inputs  : Input Tensor
+            numOut  : Desired output number of channel
+            name    : Name of the block
+        Returns:
+            conv_3  : Output Tensor
+        """
+        if self.tiny:
+            with tf.name_scope(name):
+                norm = tf.contrib.layers.batch_norm(inputs, 0.9, epsilon=1e-5, activation_fn = tf.nn.relu, is_training = self.is_train)
+                pad = tf.pad(norm, np.array([[0,0],[1,1],[1,1],[0,0]]), name= 'pad')
+                conv = self._conv(pad, int(numOut), kernel_size=3, strides=1, pad = 'VALID', name= 'conv')
+                return conv
+        else:
+            with tf.name_scope(name):
+                with tf.name_scope('norm_1'):
+                    norm_1 = tf.contrib.layers.batch_norm(inputs, 0.9, epsilon=1e-5, activation_fn = tf.nn.relu, is_training = self.is_train)
+                    conv_1 = self._conv(norm_1, int(numOut/2), kernel_size=1, strides=1, pad = 'VALID', name= 'conv')
+                with tf.name_scope('norm_2'):
+                    norm_2 = tf.contrib.layers.batch_norm(conv_1, 0.9, epsilon=1e-5, activation_fn = tf.nn.relu, is_training = self.is_train)
+                    pad = tf.pad(norm_2, np.array([[0,0],[1,1],[1,1],[0,0]]), name= 'pad')
+                    conv_2 = self._conv(pad, int(numOut/2), kernel_size=3, strides=1, pad = 'VALID', name= 'conv')
+                with tf.name_scope('norm_3'):
+                    norm_3 = tf.contrib.layers.batch_norm(conv_2, 0.9, epsilon=1e-5, activation_fn = tf.nn.relu, is_training = self.is_train)
+                    conv_3 = self._conv(norm_3, int(numOut), kernel_size=1, strides=1, pad = 'VALID', name= 'conv')
+                return conv_3
+
+
+    def _skip_layer(self, inputs, numOut, name = 'skip_layer'):
+        """ Skip Layer
+        Args:
+            inputs  : Input Tensor
+            numOut  : Desired output number of channel
+            name    : Name of the bloc
+        Returns:
+            Tensor of shape (None, inputs.height, inputs.width, numOut)
+        """
+        with tf.name_scope(name):
+            if inputs.get_shape().as_list()[3] == numOut:
+                return inputs
+            else:
+                conv = self._conv(inputs, numOut, kernel_size=1, strides = 1, name = 'conv')
+                return conv             
+    
+    def _residual(self, inputs, numOut, name = 'residual_block'):
+        """ Residual Unit
+        Args:
+            inputs  : Input Tensor
+            numOut  : Number of Output Features (channels)
+            name    : Name of the block
+        """
+        with tf.name_scope(name):
+            convb = self._conv_block(inputs, numOut)
+            skipl = self._skip_layer(inputs, numOut)
+            if self.modif:
+                return tf.nn.relu(tf.add_n([convb, skipl], name = 'res_block'))
+            else:
+                return tf.add_n([convb, skipl], name = 'res_block')
+    
+    def _hourglass(self, inputs, n, numOut, name = 'hourglass'):
+        """ Hourglass Module
+        Args:
+            inputs  : Input Tensor
+            n       : Number of downsampling step
+            numOut  : Number of Output Features (channels)
+            name    : Name of the block
+        """
+        with tf.name_scope(name):
+            # Upper Branch
+            up_1 = self._residual(inputs, numOut, name = 'up_1')
+            # Lower Branch
+            low_ = tf.contrib.layers.max_pool2d(inputs, [2,2], [2,2], padding='VALID')
+            low_1= self._residual(low_, numOut, name = 'low_1')
+            
+            if n > 0:
+                low_2 = self._hourglass(low_1, n-1, numOut, name = 'low_2')
+            else:
+                low_2 = self._residual(low_1, numOut, name = 'low_2')
+                
+            low_3 = self._residual(low_2, numOut, name = 'low_3')
+            # print("low3 ", low_3.shape)
+
+            up_2 = tf.image.resize_nearest_neighbor(low_3, tf.shape(up_1)[1:3], name = 'upsampling')
+            # print(up_1.shape, up_2.shape)
+            if self.modif:
+                # Use of RELU
+                return tf.nn.relu(tf.add_n([up_2,up_1]), name='out_hg')
+            else:
+                return tf.add_n([up_2,up_1], name='out_hg')
+
+
+
+def _help_func_dict(config,key, default_value = None):
+    if key in config:
+        return config[key]
+    else:
+        return default_value

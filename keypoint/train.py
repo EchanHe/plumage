@@ -61,9 +61,6 @@ if bool(grid_params):
             params[key] = value
             col_name += "{}-{};".format(key,value)
 
-
-
-
         print("Read training data ....")
         train_data = data_input.plumage_data_input(df_train,batch_size=params['batch_size'],is_train =params['is_train'],
                                    pre_path =params['img_folder'],state=params['data_state'],
@@ -203,6 +200,6 @@ if bool(grid_params):
         result_dict = {str(k):str(v) for k,v in result_dict.items()}
         final_grid_df = final_grid_df.append(pd.DataFrame(result_dict, index=[id_grid]))
 
-    final_grid_df.to_csv(params['valid_result_dir']+ "{}grid_search.csv".format(str(date.today())))    
+    final_grid_df.to_csv(params['valid_result_dir']+ "{}grid_search.csv".format(str(date.today())), index = False)    
 
 
