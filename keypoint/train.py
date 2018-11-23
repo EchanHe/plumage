@@ -38,7 +38,7 @@ print(grid_params)
 df_train = pd.read_csv(params['train_file'])
 df_valid = pd.read_csv(params['valid_file'])
 
-# df_train = df_train.sample(n=50,random_state=3)
+# df_train = df_train.sample(n=500,random_state=3)
 # df_valid = df_valid.sample(n=10,random_state=3)
 
 # Create the name using some of the configuratation.
@@ -49,6 +49,8 @@ if params['category'] is not None:
     df_valid = df_valid.loc[df_valid.view==params["category"],:].reset_index(drop = True)
 elif params['category'] is None or params['category'] =='all':
     params['name'] +='_' + 'all'
+
+# lr_list = np.empty([0])
 ################
 if bool(grid_params):
 
@@ -61,12 +63,13 @@ if bool(grid_params):
             params[key] = value
             col_name += "{}-{};".format(key,value)
 
+        ### Read the training data and validation data ###
         print("Read training data ....")
         train_data = data_input.plumage_data_input(df_train,batch_size=params['batch_size'],is_train =params['is_train'],
                                    pre_path =params['img_folder'],state=params['data_state'],
                                    scale=params['scale'] ,is_aug = params['img_aug'],
                                    heatmap_scale = params['output_stride'])
-        print("Read valid data ....")
+        print("Read valid data ....\n")
         valid_data = data_input.plumage_data_input(df_valid,batch_size=params['batch_size'],is_train =params['is_train'],
                                    pre_path =params['img_folder'],state=params['data_state'],
                                    scale=params['scale'] ,is_aug = params['img_aug'],
@@ -74,10 +77,10 @@ if bool(grid_params):
 
         ##### Create the network using the hyperparameters. #####
         tf.reset_default_graph()
-        model = network.CPM(params,train_data.img_width, train_data.img_height )
+        model = network.Pose_Estimation(params,train_data.img_width, train_data.img_height )
 
-        #Get prediction, loss and train_operation.
-        predict = model.inference_pose_vgg_l2()
+        network_to_use = getattr(model, params['network_name'])
+        predict = network_to_use()
         loss = model.loss()
         train_op = model.train_op(loss, model.global_step)
 
@@ -91,7 +94,7 @@ if bool(grid_params):
 
         #File name and paths
         param_dir = params['saver_directory']
-        logdir = params['log_dir']
+        logdir = os.path.join(params['log_dir'], col_name+str(date.today()))
         restore_file = params['restore_param_file']
         save_filename = "{}_{}".format(str(date.today()) ,params['name']) +col_name
         initialize = params['init']
@@ -111,16 +114,16 @@ if bool(grid_params):
                 print("Restore file from: {}".format(restore_file))
                 sess.run(init_op)
                 saver.restore(sess, restore_file)
-        #         model.restore(sess, saver, restore_file)
-            # sess.run(tf.local_variables_initializer())
-            # merged = tf.summary.merge_all()
+
+            #### Get the summary of training and weight.
             train_summary = tf.summary.merge_all('train')
+            weight_summary = tf.summary.merge_all('weight')
             writer = tf.summary.FileWriter(logdir, sess.graph)
 
                 
             for i in range(total_steps):
-                #Training part
-                #以batch_size随机选择数据 迭代max_iteration次 
+                ####### Training part ########
+                # Get input data and label from Training set, randomly.
                 tmp_global_step = model.global_step.eval()
                 img_mini, heatmap_mini,coords_mini , vis_mini = train_data.get_next_batch()
                 feed_dict = {
@@ -130,19 +133,22 @@ if bool(grid_params):
                             }
                 sess.run(train_op, feed_dict=feed_dict)
 
-                ###### Write training detail#####
-                if (i+1) % summary_steps == 0:
+                ###### Train Summary part #####
+                if (i+1) % summary_steps == 0 or i == 0:
                     print("{} steps Loss: {}".format(i+1,sess.run(loss, feed_dict=feed_dict)))
                     lear = model.learning_rate.eval()
         #             print("\tGlobal steps and learning rates: {}  {}".format(tmp_global_step,lear))
 
                     result_train=sess.run(predict, feed_dict=feed_dict)
 
-                    summary = sess.run(train_summary, feed_dict=feed_dict)    
+                    summary,weight_s = sess.run([train_summary,weight_summary], feed_dict=feed_dict)    
                     writer.add_summary(summary, tmp_global_step)
+                    writer.add_summary(weight_s, tmp_global_step)
+
+                    lr_list = np.append(lr_list, loss.eval(feed_dict=feed_dict))
                     
                 ######Validating the result part#####    
-                if (i+1) % valid_steps ==0:
+                if (i+1) % valid_steps ==0 or i == 0:
                     #Validation part
                     #write the validation result
 
@@ -202,4 +208,8 @@ if bool(grid_params):
 
     final_grid_df.to_csv(params['valid_result_dir']+ "{}grid_search.csv".format(str(date.today())), index = False)    
 
-
+# lr_list = np.round(lr_list,4)
+# N=5
+# print(lr_list)
+# print(np.diff(lr_list))
+# print(np.convolve(lr_list, np.ones((N,))/N, mode='valid'))

@@ -53,12 +53,13 @@ if 'is_valid' in params:
     is_valid = params['is_valid']
 else:
     is_valid = False
+
 ##### Create the network using the hyperparameters. #####
 tf.reset_default_graph()
-model = network.CPM(params,pred_data.img_width, pred_data.img_height)
-
+model = network.Pose_Estimation(params,pred_data.img_width, pred_data.img_height)
 #Get prediction.
-predict = model.inference_pose_vgg_l2()
+network_to_use = getattr(model, params['network_name'])
+predict = network_to_use()
 
 #File name and paths
 restore_file = params['restore_param_file']
@@ -94,6 +95,7 @@ with tf.Session() as sess:
         file_name = str(date.today()) + params['name'],
         patches_coord=None, write_index = False)
 
+# If validation, print or save the metrics between ground-truth and predictions
 if is_valid:
     gt_coords = pred_data.df[pred_data.coords_cols].values
         # Calculate metrics for points only

@@ -158,13 +158,17 @@ class plumage_data_input:
         self.img_height = img.shape[0]
 
         print("Init data class...")
-        print("\tData shape: {}\n\tbatch_size:{}\n\tscale:{}\n\tImage resolution: {}*{}\n\tImage Augmentation:{}"\
-            .format(self.df_size, self.batch_size,self.scale ,self.img_width , self.img_height, self.is_aug))
-        print("Augmentation option:" , self.aug_option)
+        print("\tData shape: {}\n\tbatch_size:{}\n\tscale:{}\n\tImage original resolution: {}*{}\n\tscaled resolution: {}*{}"\
+            .format(self.df_size, self.batch_size,self.scale ,self.img_width , self.img_height, self.img_width//self.scale , self.img_height//self.scale))
+
+        print("Image Augmentation:{}\n\tAugmentation option:".format(self.is_aug, self.aug_option))
         
         self.all_columns = df.columns
         
+        print("Data output type: {}".format(self.state))
         if self.state =='coords':
+            print("\tOutput stride: {}\n\tThe output heatmap shape: {}*{}".format(self.heatmap_scale,
+             self.img_width//(self.scale*self.heatmap_scale),  self.img_height//(self.scale*self.heatmap_scale) ))
             self.output_channel = int(len(self.coords_cols) /  self.cols_num_per_coord)
         elif self.state =='patches':
             self.output_channel = len(self.patches_cols) + 1

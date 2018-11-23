@@ -2,7 +2,7 @@ import tensorflow as tf
 import tensorflow.contrib.layers as layers
 import numpy as np
 
-class CPM:
+class Pose_Estimation:
     def __init__(self , config,ori_img_width, ori_img_height):
         """
         Initialize the model with config and its hyperparameters
@@ -60,14 +60,19 @@ class CPM:
 
         self.point_names = config['point_names']
         self.nFeat = config['nfeats']
+        ## configuration of hourglass
         if self.network_name == 'hourglass':
             self.nStack = _help_func_dict(config, 'nstacks')
             self.nLow = _help_func_dict(config, 'nlow')
             self.tiny = _help_func_dict(config, 'tiny')
-            self.w_summary  =False
             self.modif = True
 
-        print("Initialize the {} network.\n\tIs Training:{}\n\tInput shape: {}\n\tOutput shape: {}".format(self.network_name,
+
+        ## Summary configuration
+        self.weight_summary = True
+        self.filter_summary = False
+
+        print("\nInitialize the {} network.\n\tIs Training:{}\n\tInput shape: {}\n\tOutput shape: {}".format(self.network_name,
             self.is_train, self.images.shape.as_list(), self.labels.shape.as_list()))
     
 ################### functions ##########
@@ -104,6 +109,7 @@ class CPM:
         """
         Optimizer
         """
+        # add loss into summary
         self._loss_summary(total_loss)
 
         self.learning_rate = tf.train.exponential_decay(self.start_learning_rate, global_step,
@@ -191,8 +197,58 @@ class CPM:
                         self.point_acc[i], collections = ['valid'])
         self.valid_summary = tf.summary.merge_all('valid')    
     
+    def _weights_hist_summary(self):
+        """
+        Goal: add weights and bias histogram into tensorboard
+        """
+        if self.weight_summary:
+            train_vars = tf.trainable_variables(scope="")
+
+            weights = [w for w in train_vars if "weights" in w.name]
+            for weight in weights:
+                # print(weight.name)
+                tf.summary.histogram(weight.name, weight, collections = ['weight'])
+
+            biases = [w for w in train_vars if "biases" in w.name]
+            for bias in biases:
+                tf.summary.histogram(bias.name, bias, collections = ['weight'])
+
+        # self.weights_summary = tf.summary.merge_all('weight') 
+
+    def _mid_layers_summary(self, mid_layers):
+        """
+        Goal: Add output of mid layers into image summary
+        """
+        if self.filter_summary:
+            cols = 16
+            for mid in mid_layers:
+                img = mid[0,...]
+                img = tf.transpose(img, [2,0,1])
+
+                rows = img.shape[0]//cols
 
 
+
+                n, nrows, ncols = img.shape
+                w = cols*ncols
+                h = rows*nrows
+                img = tf.reshape(img,[h//int(nrows), -1, nrows, ncols])
+                img = tf.transpose(img, [0,2,1,3])
+                img = tf.reshape(img, [h, w])   
+
+                img = tf.expand_dims(img, axis = 2)
+                img = tf.expand_dims(img, axis = 0)            
+                print(img.shape)
+                tf.summary.image("mid/"+mid.name, img, max_outputs = 100,collections = ['train'])
+
+            f1 = tf.trainable_variables(scope="")[0]
+            f1 = tf.transpose(f1, [3,0,1,2])
+            tf.summary.image("filter/"+f1.name, f1, max_outputs = 100,collections = ['train'])
+                # for i in range(img.shape[-1]):
+                #     img_mini =  img[0,:,:,i]
+                #     img_mini = tf.expand_dims(img_mini, axis = 2)
+                #     img_mini = tf.expand_dims(img_mini, axis = 0)
+                #     tf.summary.image("mid/"+mid.name+"/{}".format(i), img_mini, max_outputs = 100,collections = ['train'])
     def inference_pose_vgg(self):
 
         # center_map = self.center_map
@@ -331,7 +387,7 @@ class CPM:
 
 
 
-    def inference_pose_vgg_l2(self):
+    def cpm_vgg(self):
 
         # center_map = self.center_map
         is_train = self.is_train
@@ -345,7 +401,7 @@ class CPM:
             self.images = tf.image.rgb_to_grayscale(self.images)
 
         image = self.images
-        with tf.variable_scope('PoseNet'):
+        with tf.variable_scope('CPM'):
             # print("lambda : {} keep prob: {} ".format(self.lambda_l2 , self.keep_prob))
             regularizer = tf.contrib.layers.l2_regularizer(scale=0.0005)
             # pool_center_lower = layers.avg_pool2d(center_map, 9, 8, padding='SAME')
@@ -511,6 +567,9 @@ class CPM:
                 self.add_to_euclidean_loss(self.batch_size, Mconv7_stage6, self.labels, 'st')
         # self.add_to_accuracy(Mconv7_stage6)
         self._create_summary(Mconv7_stage6)
+
+        self._mid_layers_summary([conv2_2,conv3_4,conv4_3,Mconv6_stage5])
+        self._weights_hist_summary()
         return Mconv7_stage6
 
 ################### Stacked hourglass#####################
@@ -536,6 +595,50 @@ class CPM:
 
 
         tf.add_to_collection("losses", loss)
+
+
+    def unblockshaped_withc(self,tensor, h, w):
+        """
+        input 
+        Return an array of shape (h, w, c) where
+        h * w = arr.size //  c
+
+        If arr is of shape (n, nrows, ncols, c), n sublocks of shape (nrows, ncols),
+        then the returned array preserves the "physical" layout of the sublocks.
+        """
+        n, nrows, ncols,c  = tensor.shape
+
+        tensor = tf.reshape(tensor,[h//int(nrows), -1, nrows, ncols, c])
+        tensor = tf.transpose(tensor, [0,2,1,3,4])
+        tensor = tf.reshape(tensor, [h, w, c]) 
+        return tensor
+
+    def _filter_summary_hg(self):
+        """
+        Goal: Add output of mid layers into image summary
+        """
+        if self.filter_summary:
+            train_vars = tf.trainable_variables(scope="")
+            weights = [w for w in train_vars if "weights" in w.name]
+            f1 = weights[0]
+            f1 = tf.transpose(f1, [3,0,1,2])
+
+            tf.summary.image("filter/"+f1.name, f1, max_outputs = 100,collections = ['train'])
+            # unblock the 4D to 3D
+            cols = 16
+            rows = f1.shape[0]//cols
+            n, nrows, ncols, c = f1.shape
+            w = cols*ncols
+            h = rows*nrows
+                
+            f1 = self.unblockshaped_withc(f1, h, w) 
+
+            f1 = tf.expand_dims(f1, axis = 0)      
+
+            f1 = tf.image.resize_images(f1,  [f1.shape[0]*20, f1.shape[1]*20])
+            tf.summary.image("filter/"+f1.name, f1, max_outputs = 100,collections = ['train'])
+
+
     def hourglass(self):
         """Create the Network
         Args:
@@ -546,7 +649,7 @@ class CPM:
             self.images = tf.image.rgb_to_grayscale(self.images)
 
         images = self.images
-        with tf.name_scope('model'):
+        with tf.name_scope('hourglass'):
             with tf.name_scope('preprocessing'):
                 # Input Dim : nbImages x 256 x 256 x 3
                 pad1 = tf.pad(images, [[0,0],[2,2],[2,2],[0,0]], name='pad_1')
@@ -658,8 +761,9 @@ class CPM:
                     predicts = tf.stack(out, axis= 1 , name = 'final_output')
                 self.add_loss_stacked_hourglass(predicts)
 
-                self._create_summary(predicts[:,self.nStack-1,...])
-                return predicts[:,self.nStack-1,...]
+        self._create_summary(predicts[:,self.nStack-1,...])
+        self._filter_summary_hg()
+        return predicts[:,self.nStack-1,...]
 
                     
     def _conv(self, inputs, filters, kernel_size = 1, strides = 1, pad = 'VALID', name = 'conv'):
@@ -678,7 +782,7 @@ class CPM:
             # Kernel for convolution, Xavier Initialisation
             kernel = tf.Variable(tf.contrib.layers.xavier_initializer(uniform=False)([kernel_size,kernel_size, inputs.get_shape().as_list()[3], filters]), name= 'weights')
             conv = tf.nn.conv2d(inputs, kernel, [1,strides,strides,1], padding=pad, data_format='NHWC')
-            if self.w_summary:
+            if self.weight_summary:
                 with tf.device('/cpu:0'):
                     tf.summary.histogram('weights_summary', kernel, collections = ['weight'])
             return conv            
@@ -699,7 +803,7 @@ class CPM:
             kernel = tf.Variable(tf.contrib.layers.xavier_initializer(uniform=False)([kernel_size,kernel_size, inputs.get_shape().as_list()[3], filters]), name= 'weights')
             conv = tf.nn.conv2d(inputs, kernel, [1,strides,strides,1], padding='VALID', data_format='NHWC')
             norm = tf.contrib.layers.batch_norm(conv, 0.9, epsilon=1e-5, activation_fn = tf.nn.relu, is_training = self.is_train)
-            if self.w_summary:
+            if self.weight_summary:
                 with tf.device('/cpu:0'):
                     tf.summary.histogram('weights_summary', kernel, collections = ['weight'])
             return norm
