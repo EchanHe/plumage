@@ -25,7 +25,7 @@ import data_input
 from plumage_config import process_config, generate_grid_params
 from points_util import heatmap_to_coord
 from points_metrics import *
-from points_io import write_pred_dataframe
+from points_io import write_pred_dataframe, build_result_dict
 
 print('--Parsing Config File')
 config_name = 'config_train.cfg'
@@ -38,8 +38,8 @@ print(grid_params)
 df_train = pd.read_csv(params['train_file'])
 df_valid = pd.read_csv(params['valid_file'])
 
-# df_train = df_train.sample(n=500,random_state=3)
-# df_valid = df_valid.sample(n=10,random_state=3)
+df_train = df_train.sample(n=500,random_state=3)
+df_valid = df_valid.sample(n=50,random_state=3)
 
 # Create the name using some of the configuratation.
 print(params['category'])
@@ -145,7 +145,7 @@ if bool(grid_params):
                     writer.add_summary(summary, tmp_global_step)
                     writer.add_summary(weight_s, tmp_global_step)
 
-                    lr_list = np.append(lr_list, loss.eval(feed_dict=feed_dict))
+                    # lr_list = np.append(lr_list, loss.eval(feed_dict=feed_dict))
                     
                 ######Validating the result part#####    
                 if (i+1) % valid_steps ==0 or i == 0:
@@ -198,12 +198,16 @@ if bool(grid_params):
             patches_coord=None, write_index = False )
 
         result_dict = params
-        result_dict['mean_pck'] = round(np.nanmean(pck), 4)
-        result_dict['mean_diff_per_pt'] = round(np.nanmean(diff_per_pt), 4)
-        result_dict['pck{}'.format(params['pck_threshold'])] = np.round(pck, 4)
-        result_dict['diff_per_pt'] = np.round(diff_per_pt, 4)
+        result_dict = build_result_dict(result_dict = params,
+            pck = np.round(pck, 4), mean_pck = round(np.nanmean(pck), 4), pck_threshold = params['pck_threshold'],
+            diff_per_pt=np.round(diff_per_pt, 4), mean_diff_per_pt = round(np.nanmean(diff_per_pt), 4))
 
-        result_dict = {str(k):str(v) for k,v in result_dict.items()}
+        # result_dict['mean_pck'] = round(np.nanmean(pck), 4)
+        # result_dict['mean_diff_per_pt'] = round(np.nanmean(diff_per_pt), 4)
+        # result_dict['pck{}'.format(params['pck_threshold'])] = np.round(pck, 4)
+        # result_dict['diff_per_pt'] = np.round(diff_per_pt, 4)
+
+        # result_dict = {str(k):str(v) for k,v in result_dict.items()}
         final_grid_df = final_grid_df.append(pd.DataFrame(result_dict, index=[id_grid]))
 
     final_grid_df.to_csv(params['valid_result_dir']+ "{}grid_search.csv".format(str(date.today())), index = False)    

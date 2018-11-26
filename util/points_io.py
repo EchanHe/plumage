@@ -101,6 +101,32 @@ def write_point_result(pred_coord , gt_coords,lm_cnt, params, folder):
     f = open(folder+result_name,"w")
     f.write(json.dumps(result ,indent=2 , sort_keys=True))
     f.close()
+
+def build_result_dict(result_dict= {},name = None,
+    pck = None, mean_pck = None, pck_threshold = None,
+    diff_per_pt=None, mean_diff_per_pt = None,
+    in_poly = None, mean_in_poly = None,
+    iou = None, mean_iou = None,
+    precision = None, mean_precision = None ):
+    """
+    Goals: write value into dictionry, the default value is None
+        which the dict can be used into grid searching result.
+    """
+
+    result_dict['name'] = name
+    result_dict['pck{}'.format(pck_threshold)] = pck
+    result_dict['mean_pck'] = mean_pck
+    result_dict['diff_per_pt'] = diff_per_pt
+    result_dict['mean_diff_per_pt'] = mean_diff_per_pt
+    result_dict['in_poly'] = in_poly
+    result_dict['mean_in_poly'] = mean_in_poly
+    result_dict['iou'] = iou
+    result_dict['mean_iou'] = mean_iou
+    result_dict['precision'] = precision
+    result_dict['mean_precision'] = mean_precision
+    result_dict = {str(k):str(v) for k,v in result_dict.items()}
+    return result_dict
+
 ### Goal: Get the dictionray from params.
 # Used in write_point_result
 def get_info_from_params_points(params):
@@ -129,6 +155,5 @@ def write_coord(pred_coords , gt_coords , folder,file_name = "hg_valid_coords" )
     print("save GROUND TRUTH in " + gt_file_name)
     np.savetxt(pred_file_name, pred_coords, delimiter=",")
     np.savetxt(gt_file_name, gt_coords, delimiter=",")
-
 
 

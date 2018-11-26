@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import os
 import cv2
+import re
 
 ##### Segmentation part ##########
 
@@ -325,7 +326,170 @@ def show_patches(plt,patch, color = 'cyan' , is_patch = True ):
 #### Coords part ######
 
 
+#### Result analysis part ####
+
+def analyse_time(time_series, plt, seg_duration = 100):
+    """
+    Goal: analyse the time
+    
+    params:
+        time_series: the series of with time segs [ts_1, ..., ts_n] as value and configs as index
+        plt: plot
+        seg_duration, the iters for one time segmentions. Default value is 100
+    """
+    fig=plt.figure()
+    ax = fig.add_subplot(211)  
+        #Draw the barplot
+    ax2 = fig.add_subplot(212)  
+    
+    result = pd.DataFrame()
+    
+    for i, v in time_series.items():
+        
+        times = str_to_array(v)
+
+        segs = times.shape[0]
+        total_time = segs * seg_duration
+        segs = np.arange(0, total_time, seg_duration )
+        
+        # Draw the labels of the configs
+        draw_line_plot(ax, segs, times, i)
+        
+        result.loc['time',i] = times[-1]
+        
+        ax2.barh(i, times[-1], align='center')
+        
+    ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    ax.set_title('Time', fontsize = 'x-large')  # Set the pokemon's name as the title
+    plt.ylabel("Sec")
+    plt.xlabel("Iterations")
+
+    
+    return result
+
+
+def draw_radar(ax,vals,labels , config_name , title):
+    """
+    Goal: draw radar plot
+    
+    params:
+        ax: axis from matplot
+        vals
+    """
+    
+    angles=np.linspace(0, 2*np.pi, len(vals), endpoint=False) # Set the angle
+    angles=np.concatenate((angles,[angles[0]]))
+
+    vals=np.concatenate((vals,[vals[0]])) 
+
+    ax.plot(angles, vals, 'o-' , label=config_name)  # Draw the plot (or the frame on the radar chart)
+    ax.fill(angles, vals, alpha=0.25)  #Fulfill the area  
+    if "diff" not in title:    
+        ax.set_ylim([0,1.0])    
+
+#     angles=np.linspace(np.pi/2, 2*np.pi+np.pi/2, len(labels), endpoint=False) # Set the angle
+    if labels is not None:
+        ax.set_thetagrids(angles * 180/np.pi, labels)  # Set the label for each axis
+        
+def radar_for_df(plt, df , metric, labels, exclude_index =None , include_index = None):
+    """
+    Goal: draw radar plot for all configs of the dataframe
+    
+    params:
+        plt: plt
+        df: data frame of the stat table format
+        metric: metric to draw
+        labels: a list of label for every class of value
+        exclude_index: default is None, and exclude the index of value list.
+    """
+    
+    config_names = df["name"]
+
+    #Plot for list value for every patches or labels.
+    fig = plt.figure()
+    ax = plt.gca(projection = "polar")
+    
+    if exclude_index is not None:
+        labels = np.delete(labels,exclude_index)
+    if include_index is not None:
+        labels = np.take(labels, include_index)
+    for idx,confid_name in enumerate(config_names):
+        value = df.loc[idx ,metric]
+        value = str_to_array(value)
+        
+        if exclude_index is not None:
+            value = np.delete(value,exclude_index)
+        if include_index is not None:
+            value = np.take(value, include_index)
+        draw_radar(ax,value, labels, confid_name, metric)
+    
+    ax.legend(bbox_to_anchor=(1.2, 1), loc=2, borderaxespad=0.) #write the labels box  
+    fig.suptitle(metric , y = 1.0, fontsize = 20)
+
+def draw_barplot(ax, val, x, config_name, horizontal = True):
+    """
+    Goal: draw bar plot
+    
+    params:
+        ax: axis from matplot
+        val: numerical value
+        x: the name of x value
+        config_name: the configuration name
+        horizontal: whether draw the horizontal plot or not
+    """
+    if horizontal:
+        ax.barh(x,val, align='center',label = config_name)
+    else:
+        ax.bar(x,val, align='center',label = config_name)
+    
+
+def barplot_for_df(plt, df, metric, horizontal= True):
+    """
+    Goal: draw bar plot for all configs of the dataframe
+    
+    params:
+        plt: plt
+        df: data frame of the stat table format
+        metric: metric to draw
+        horizontal: whether draw the horizontal plot or not
+    """
+    
+    config_names = df["name"]
+
+    #Plot for list value for every patches or labels.
+    fig = plt.figure()
+    ax = plt.gca()
+    for idx,confid_name in enumerate(config_names):
+        value = float(df.loc[idx ,metric])
+        draw_barplot(ax,value, idx, confid_name, horizontal = horizontal)
+    
+    ax.legend(bbox_to_anchor=(1.2, 1), loc=2, borderaxespad=0.) #write the labels box  
+    fig.suptitle(metric)
+    
+
 ##small util##
+
+def str_to_array(s):
+    """
+    Goal: Cast string array to np array
+    
+    params:
+        s, string
+    
+    return np.array
+    """
+    
+    #Check whether string is '[....] format'
+    m = re.match('\[[\S*\s*]*\]', s)
+    assert m is not None, "The string is not in \'[....]\'"
+    #transer string to array
+    if ',' not in s:
+        s = re.sub( '\[\s+', '[', s )
+        s = re.sub( '\s+\]', ']', s )
+        s = re.sub( '\s+', ',', s ).strip()
+    result = np.array(eval(s))
+    return result
+
 
 def _none_or_element(array , id_batch):
     if array is not None:

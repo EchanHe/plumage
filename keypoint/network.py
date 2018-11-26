@@ -15,12 +15,6 @@ class Pose_Estimation:
         self.global_step = tf.get_variable("global_step", initializer=0,
                     dtype=tf.int32, trainable=False)
 
-        if self.is_train is True:
-            self.start_learning_rate =config["learning_rate"]
-            self.decay_step = config["decay_step"]
-            self.learning_rate_decay = config["learning_rate_decay"]
-            self.lambda_l2 = config["l2"]
-
         self.batch_size = config["batch_size"]
 
         self.points_num = config["points_num"]
@@ -38,11 +32,6 @@ class Pose_Estimation:
                 dtype = tf.float32,
                 shape = (self.batch_size, self.img_height, self.img_width, 3)
                 )
-        self.center_map = tf.placeholder(
-                dtype = tf.float32,
-                shape = (self.batch_size, self.img_height, self.img_width, 1)
-            )
-
         self.labels = tf.placeholder(
                 dtype = tf.float32,
                 shape = (self.batch_size, self.fm_height, self.fm_width, self.points_num))
@@ -52,11 +41,9 @@ class Pose_Estimation:
         self.vis_mask = tf.placeholder(
                 dtype = tf.float32,
                 shape = (self.batch_size, self.fm_height, self.fm_width, self.points_num))
-        self.pred_images = tf.placeholder(
-                dtype = tf.float32,
-                shape = (None, self.img_height, self.img_width, 3)
-                )
+
         self.dropout_rate = config['dropout_rate']
+        self.lambda_l2 = config["l2"]
 
         self.point_names = config['point_names']
         self.nFeat = config['nfeats']
@@ -68,9 +55,14 @@ class Pose_Estimation:
             self.modif = True
 
 
-        ## Summary configuration
-        self.weight_summary = True
-        self.filter_summary = False
+        if self.is_train is True:
+            self.start_learning_rate =config["learning_rate"]
+            self.decay_step = config["decay_step"]
+            self.learning_rate_decay = config["learning_rate_decay"]
+            
+                    ## Summary configuration
+            self.weight_summary = _help_func_dict(config, 'weight_summary', False)
+            self.filter_summary = _help_func_dict(config, 'filter_summary', False)
 
         print("\nInitialize the {} network.\n\tIs Training:{}\n\tInput shape: {}\n\tOutput shape: {}".format(self.network_name,
             self.is_train, self.images.shape.as_list(), self.labels.shape.as_list()))

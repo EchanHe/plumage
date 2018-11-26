@@ -49,10 +49,17 @@ def to_convex_hull(pred_segs):
 def segs_to_masks(segs):
     assert len(segs.shape) ==3 , "Make sure input is [batch_size , height, width]"
     df_size = segs.shape[0]
-    cl, n_cl = extract_classes(segs[0,...] )
+    # if n_cl is None:
+    #     cl, n_cl = extract_classes(segs[0,...] )
+    # else:
+    #     cl, _ = extract_classes(segs[0,...] )
+    n_cl = np.max(segs) + 1
 
     masks = np.zeros((segs.shape[0] , segs.shape[1] , segs.shape[2] , n_cl))
+    print(masks.shape)
     for i in np.arange(df_size):
+        cl, _ = extract_classes(segs[i,...] )
+        # print(np.sum(extract_masks(segs[i,...] , cl, n_cl)))
         masks[i,...] = extract_masks(segs[i,...] , cl, n_cl)
 
     return masks
@@ -94,8 +101,9 @@ def union_classes(eval_segm, gt_segm):
 def extract_masks(segm, cl, n_cl):
     h, w  = segm_size(segm)
     masks = np.zeros((h, w , n_cl))
-
+    # print(masks.shape)
     for i, c in enumerate(cl):
+        # print(c)
         masks[:, : , i] = segm == c
 
     return masks
