@@ -61,9 +61,9 @@ class Pose_Estimation:
             self.learning_rate_decay = config["learning_rate_decay"]
             
                     ## Summary configuration
-            self.weight_summary = _help_func_dict(config, 'weight_summary', False)
-            self.filter_summary = _help_func_dict(config, 'filter_summary', False)
-            self.result_summary = _help_func_dict(config, 'result_summary', False)
+        self.weight_summary = _help_func_dict(config, 'weight_summary', False)
+        self.filter_summary = _help_func_dict(config, 'filter_summary', False)
+        self.result_summary = _help_func_dict(config, 'result_summary', False)
 
         print("\nInitialize the {} network.\n\tIs Training:{}\n\tInput shape: {}\n\tOutput shape: {}".format(self.network_name,
             self.is_train, self.images.shape.as_list(), self.labels.shape.as_list()))

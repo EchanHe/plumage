@@ -73,6 +73,10 @@ def build_result_dict(result_dict= {},name = None,
     Goals: write value into dictionry, the default value is None
         which the dict can be used into grid searching result.
     """
+    remove_keys = ['restore_param_file', 'config_name']
+    for remove_key in remove_keys:
+        if remove_key in result_dict.keys():
+            result_dict.pop(remove_key)
 
     result_dict['name'] = name
     result_dict['pck{}'.format(pck_threshold)] = pck

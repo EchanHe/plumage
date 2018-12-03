@@ -28,15 +28,14 @@ from points_util import heatmap_to_coord
 from points_metrics import *
 from points_io import write_pred_dataframe, build_result_dict
 
-
-def read_data(params):
+def read_csv(params):
     ##reading data###
     df_train = pd.read_csv(params['train_file'])
     df_valid = pd.read_csv(params['valid_file'])
 
     #Sampling a sub set
-    # df_train = df_train.sample(n=500,random_state=3)
-    # df_valid = df_valid.sample(n=50,random_state=3)
+    df_train = df_train.sample(n=100,random_state=3)
+    df_valid = df_valid.sample(n=20,random_state=3)
 
     # Create the name using some of the configuratation.
     print(params['category'])
@@ -46,6 +45,10 @@ def read_data(params):
         df_valid = df_valid.loc[df_valid.view==params["category"],:].reset_index(drop = True)
     else:
         params['name'] +='_' + 'all'
+    return df_train, df_valid
+
+def create_data(params, df_train, df_valid):
+
     ### Read the training data and validation data ###
     print("Read training data ....")
     train_data = data_input.plumage_data_input(df_train,batch_size=params['batch_size'],is_train =params['is_train'],
@@ -171,12 +174,29 @@ def trainining(params, train_data, valid_data):
             if (i + 1) % saver_steps == 0:        
                 tmp_global_step = model.global_step.eval()
                 epochs = (tmp_global_step*params["batch_size"])//train_data_size
-                model.save(sess, saver, save_filename,epochs)    
+                model.save(sess, saver, save_filename,epochs)  
+        params['restore_param_file'] = "{}-{}".format(save_filename, epochs)
     return model, predict    
 
-def get_and_eval_result(model, predict, valid_data):
+def get_and_eval_result(params, valid_data):
+    params_valid = params.copy()
+    params_valid['is_train'] = False
+    params_valid['l2'] = 0.0
+
+    tf.reset_default_graph()
+    model = network.Pose_Estimation(params_valid,
+        valid_data.img_width, valid_data.img_height )
+
+    network_to_use = getattr(model, params_valid['network_name'])
+    predict = network_to_use()
+
+    saver = tf.train.Saver()
+    init_op = tf.global_variables_initializer()
     # Get the predictions:
     with tf.Session() as sess:
+        sess.run(init_op)
+        saver.restore(sess, params_valid['saver_directory'] + params_valid["restore_param_file"])
+
         pred_coords = np.zeros((0, 2*valid_data.lm_cnt))
         for i_df_valid in np.arange(0,valid_data.df.shape[0],valid_data.batch_size):
             img_mini, heatmap_mini,coords_mini , vis_mini = valid_data.get_next_batch_no_random()
@@ -194,16 +214,17 @@ def get_and_eval_result(model, predict, valid_data):
 
     gt_coords = valid_data.df[valid_data.coords_cols].values
     diff_per_pt ,pck= pck_accuracy(pred_coords , gt_coords,
-            lm_cnt = valid_data.lm_cnt , pck_threshold = params['pck_threshold'],scale = 1)
+            lm_cnt = valid_data.lm_cnt , pck_threshold = params_valid['pck_threshold'],scale = 1)
 
     write_pred_dataframe(valid_data , pred_coords ,
-        folder = params['valid_result_dir']+"grid_temp/",
-        file_name = str(date.today()) + params['config_name'],
+        folder = params_valid['valid_result_dir']+"grid_temp/",
+        file_name = str(date.today()) + params_valid['config_name'],
         patches_coord=None, write_index = False )
-    result_dict = params
-    result_dict = build_result_dict(result_dict = params,
-        pck = np.round(pck, 4), mean_pck = round(np.nanmean(pck), 4), pck_threshold = params['pck_threshold'],
+
+    result_dict = build_result_dict(result_dict = params_valid,
+        pck = np.round(pck, 4), mean_pck = round(np.nanmean(pck), 4), pck_threshold = params_valid['pck_threshold'],
         diff_per_pt=np.round(diff_per_pt, 4), mean_diff_per_pt = round(np.nanmean(diff_per_pt), 4))
+
     return result_dict, pred_coords
 
 
@@ -213,14 +234,14 @@ if len(args)==2:
     config_name = args[1]
 else:
     config_name = 'config_train.cfg'
-print('--Parsing Config File: {}'.format(config_train))
+print('--Parsing Config File: {}'.format(config_name))
 
 params = process_config(os.path.join(dirname, config_name))
 grid_params = generate_grid_params(params)
 print(grid_params)
 
 
-
+df_train,df_valid = read_csv(params)
 # lr_list = np.empty([0])
 ################
 if bool(grid_params):
@@ -235,25 +256,13 @@ if bool(grid_params):
             params[key] = value
             config_name += "{}-{};".format(key,value)
 
-        train_data, valid_data = read_data(params)    
+        train_data, valid_data = create_data(params, df_train,df_valid)    
 
         ##### Create the network using the hyperparameters. #####
         model , predict = trainining(params, train_data, valid_data)
 
         # produce the result;
-        pred_coords = get_result(model,predict, valid_data)
-
-        # Evaluate all and write in a dataframe.
-        # The csv of both Ground truth and validation.
-        
-        # pred_coord = heatmap_to_coord(_prediction , valid_data.img_width , valid_data.img_height)
-        # Calculate metrics for points only
-
-
-        result_dict = params
-        result_dict = build_result_dict(result_dict = params,
-            pck = np.round(pck, 4), mean_pck = round(np.nanmean(pck), 4), pck_threshold = params['pck_threshold'],
-            diff_per_pt=np.round(diff_per_pt, 4), mean_diff_per_pt = round(np.nanmean(diff_per_pt), 4))
+        result_dict , pred_coords = get_and_eval_result(params , valid_data)
 
 
         final_grid_df = final_grid_df.append(pd.DataFrame(result_dict, index=[id_grid]))

@@ -55,8 +55,7 @@ def generate_grid_params(params):
 
 def extract_config_name(params):
     keys = ['scale' , 'is_grey' , 'img_aug',
-        'learning_rate','learning_rate_decay', 'decay_step',
-        'batch_size', 'l2','dropout_rate', 
+        'learning_rate','batch_size', 'l2','dropout_rate', 
         'nlow','nstacks','output_stride']
     params['config_name'] = ""
     for key in keys:
