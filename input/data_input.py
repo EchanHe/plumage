@@ -16,6 +16,8 @@ import math
 from PIL import ImageEnhance,ImageChops,ImageOps,ImageFilter
 import sys
 
+from config_data import return_patches_cols , return_coords_cols
+
 
 def check_masks(masks):
     """
@@ -99,28 +101,29 @@ class plumage_data_input:
     file_name_col = 'file.vis'
     file_info_cols = ['file.vis', 'file.uv', 'view' , 'img.missing']
 
-    patches_cols = ['poly.crown' , 'poly.nape','poly.mantle', 'poly.rump', 'poly.tail',
-    'poly.throat', 'poly.breast', 'poly.belly', 'poly.tail.underside',
-     'poly.wing.coverts',   'poly.wing.primaries.secondaries']
+    # patches_cols = ['poly.crown' , 'poly.nape','poly.mantle', 'poly.rump', 'poly.tail',
+    # 'poly.throat', 'poly.breast', 'poly.belly', 'poly.tail.underside',
+    #  'poly.wing.coverts',   'poly.wing.primaries.secondaries']
 
-    coords_cols = ['s02.standard_x', 's02.standard_y', 's20.standard_x', 's20.standard_y',
-       's40.standard_x', 's40.standard_y', 's80.standard_x', 's80.standard_y',
-       's99.standard_x', 's99.standard_y','crown_x', 'crown_y', 'nape_x',
-       'nape_y', 'mantle_x', 'mantle_y', 'rump_x', 'rump_y', 'tail_x',
-       'tail_y', 'throat_x', 'throat_y', 'breast_x', 'breast_y', 'belly_x',
-       'belly_y', 'tail.underside_x', 'tail.underside_y', 'wing.coverts_x',
-       'wing.coverts_y', 'wing.primaries.secondaries_x',
-       'wing.primaries.secondaries_y']
-    contour_col = ["poly.outline" ]
-    cols_num_per_coord = 2
-    lm_cnt = int(len(coords_cols) /  cols_num_per_coord)
+    # coords_cols = ['s02.standard_x', 's02.standard_y', 's20.standard_x', 's20.standard_y',
+    #    's40.standard_x', 's40.standard_y', 's80.standard_x', 's80.standard_y',
+    #    's99.standard_x', 's99.standard_y','crown_x', 'crown_y', 'nape_x',
+    #    'nape_y', 'mantle_x', 'mantle_y', 'rump_x', 'rump_y', 'tail_x',
+    #    'tail_y', 'throat_x', 'throat_y', 'breast_x', 'breast_y', 'belly_x',
+    #    'belly_y', 'tail.underside_x', 'tail.underside_y', 'wing.coverts_x',
+    #    'wing.coverts_y', 'wing.primaries.secondaries_x',
+    #    'wing.primaries.secondaries_y']
+    # contour_col = ["poly.outline" ]
+    # cols_num_per_coord = 2
+    # lm_cnt = int(len(coords_cols) /  cols_num_per_coord)
     
     aug_option = {'trans' :True , 'rot' :True , 'scale' :True}
     STATE_OPTIONS = ['coords', 'contour', 'patches']
     
     #---basic config ---
     def __init__(self,df,batch_size,is_train,pre_path, state,
-        scale=1 ,is_aug = True , heatmap_scale = 4):
+        scale=1 ,is_aug = True , heatmap_scale = 4,
+         view = 'all', no_standard = False , train_ids = None):
         """
         init function for the data
         
@@ -144,13 +147,15 @@ class plumage_data_input:
         self.is_train = is_train
         self.is_aug = is_aug
         
-        assert state in self.STATE_OPTIONS, "State is not in {}".format(self.STATE_OPTIONS)
-        self.state = state
-
+        self.all_columns = df.columns
+        self.coords_cols = return_coords_cols(view = view , no_standard = no_standard, train_ids = train_ids)
+        self.patches_cols = return_patches_cols(view = view , train_ids = train_ids)
+        self.cols_num_per_coord = 2
+        self.lm_cnt = int(len(self.coords_cols) /  self.cols_num_per_coord)
+        
         self.start_idx =0
         self.indices = np.arange(self.df_size)
         np.random.shuffle(self.indices)
-
         filepath_test = pre_path+df.loc[df.index[0],self.file_name_col]
         img = cv2.imread(filepath_test)
 #         img = Image.open(filepath_test)
@@ -163,12 +168,15 @@ class plumage_data_input:
 
         print("Image Augmentation:{}\n\tAugmentation option:".format(self.is_aug, self.aug_option))
         
-        self.all_columns = df.columns
         
+        assert state in self.STATE_OPTIONS, "State is not in {}".format(self.STATE_OPTIONS)
+        self.state = state
+
         print("Data output type: {}".format(self.state))
         if self.state =='coords':
-            print("\tOutput stride: {}\n\tThe output heatmap shape: {}*{}".format(self.heatmap_scale,
-             self.img_width//(self.scale*self.heatmap_scale),  self.img_height//(self.scale*self.heatmap_scale) ))
+            print("\tOutput stride: {}\n\tThe output heatmap shape: {}*{}*{}".format(self.heatmap_scale,
+             self.img_width//(self.scale*self.heatmap_scale),  self.img_height//(self.scale*self.heatmap_scale), self.lm_cnt ))
+            
             self.output_channel = int(len(self.coords_cols) /  self.cols_num_per_coord)
         elif self.state =='patches':
             self.output_channel = len(self.patches_cols) + 1
@@ -488,7 +496,7 @@ class plumage_data_input:
         return patches_coords 
     def get_y_coord(self ,df,scale = 1,coord_only = False):
         """
-        返回[m,2*landmark]的关键点坐标数组
+        Goal: return [batch size, 2 * landmark count]
         """
         l_m_columns = self.coords_cols
         cols_num_per_coord = self.cols_num_per_coord
@@ -528,7 +536,8 @@ class plumage_data_input:
 
     def get_y_map(self ,df):
         """
-        返回[m,64,64,landmark]的关键点热点图
+        Goal: return a series of heatmaps for each key points
+        shape:  [batchsize, heatmap_height, heatmap_width, landmark count]
         """
         l_m_columns = self.coords_cols
         cols_num_per_coord = self.cols_num_per_coord
@@ -609,7 +618,10 @@ class plumage_data_input:
         return y_map
     def get_y_vis_map(self ,df):
         """
-        返回[m,64,64,landmark]的关键点是否能看到热点图
+        Goal: return a series of masks for each key points
+        if there is a key point, the mask is one matrix
+        if there is not a key point, the mask is zero matrix
+        shape:  [batchsize, heatmap_height, heatmap_width, landmark count]
         """
         l_m_columns = self.coords_cols
 

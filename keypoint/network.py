@@ -52,7 +52,7 @@ class Pose_Estimation:
             self.nStack = _help_func_dict(config, 'nstacks')
             self.nLow = _help_func_dict(config, 'nlow')
             self.tiny = _help_func_dict(config, 'tiny')
-            self.modif = True
+            self.modif = False
 
 
         if self.is_train is True:
@@ -63,6 +63,7 @@ class Pose_Estimation:
                     ## Summary configuration
             self.weight_summary = _help_func_dict(config, 'weight_summary', False)
             self.filter_summary = _help_func_dict(config, 'filter_summary', False)
+            self.result_summary = _help_func_dict(config, 'result_summary', False)
 
         print("\nInitialize the {} network.\n\tIs Training:{}\n\tInput shape: {}\n\tOutput shape: {}".format(self.network_name,
             self.is_train, self.images.shape.as_list(), self.labels.shape.as_list()))
@@ -134,7 +135,7 @@ class Pose_Estimation:
         Save the loss to summary log
         """
         with tf.device(self.cpu):
-            with tf.name_scope('train'):
+            with tf.name_scope('train_loss'):
                 tf.summary.scalar(loss.op.name + "_raw", loss,collections=['train'])
 
         # self.valid_loss_summary = tf.summary.scalar("Validation Loss", loss )
@@ -179,8 +180,9 @@ class Pose_Estimation:
         # self.point_pck = tf.placeholder(dtype = tf.float32,
         #  shape = (self.points_num,))        
         with tf.device(self.cpu):
-            with tf.name_scope('train'):
-                self._fm_summary(pred_img)
+            if self.result_summary:
+                with tf.name_scope('train'):
+                    self._fm_summary(pred_img)
                 # tf.summary.scalar("Training loss", self.loss_value, collections = ['train'])
             tf.summary.scalar("Valid loss", self.valid_loss, collections = ['valid'])
             with tf.name_scope('valid'):
@@ -199,11 +201,11 @@ class Pose_Estimation:
             weights = [w for w in train_vars if "weights" in w.name]
             for weight in weights:
                 # print(weight.name)
-                tf.summary.histogram(weight.name, weight, collections = ['weight'])
+                tf.summary.histogram(weight.name, weight, collections = ['train'])
 
             biases = [w for w in train_vars if "biases" in w.name]
             for bias in biases:
-                tf.summary.histogram(bias.name, bias, collections = ['weight'])
+                tf.summary.histogram(bias.name, bias, collections = ['train'])
 
         # self.weights_summary = tf.summary.merge_all('weight') 
 
@@ -230,7 +232,7 @@ class Pose_Estimation:
 
                 img = tf.expand_dims(img, axis = 2)
                 img = tf.expand_dims(img, axis = 0)            
-                print(img.shape)
+                #print(img.shape)
                 tf.summary.image("mid/"+mid.name, img, max_outputs = 100,collections = ['train'])
 
             f1 = tf.trainable_variables(scope="")[0]
@@ -776,7 +778,7 @@ class Pose_Estimation:
             conv = tf.nn.conv2d(inputs, kernel, [1,strides,strides,1], padding=pad, data_format='NHWC')
             if self.weight_summary:
                 with tf.device('/cpu:0'):
-                    tf.summary.histogram('weights_summary', kernel, collections = ['weight'])
+                    tf.summary.histogram('weights_summary', kernel, collections = ['train'])
             return conv            
 
     def _conv_bn_relu(self, inputs, filters, kernel_size = 1, strides = 1, pad = 'VALID', name = 'conv_bn_relu'):
@@ -797,7 +799,7 @@ class Pose_Estimation:
             norm = tf.contrib.layers.batch_norm(conv, 0.9, epsilon=1e-5, activation_fn = tf.nn.relu, is_training = self.is_train)
             if self.weight_summary:
                 with tf.device('/cpu:0'):
-                    tf.summary.histogram('weights_summary', kernel, collections = ['weight'])
+                    tf.summary.histogram('weights_summary', kernel, collections = ['train'])
             return norm
 
     def _conv_block(self, inputs, numOut, name = 'conv_block'):

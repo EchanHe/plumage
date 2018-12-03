@@ -55,16 +55,40 @@ def write_pred_dataframe(valid_data , pred_coord , folder,file_name , patches_co
     p_result = pd.DataFrame(patches_coord, columns = valid_data.patches_cols)
     result = pd.concat([df_file_names,result,p_result],axis=1)
 
-    result.loc[result['view']=='back', no_back_cols]=-1
-    result.loc[result['view']=='belly', no_belly_cols]=-1
-    result.loc[result['view']=='side', no_side_cols]=-1
+    result.loc[result['view']=='back', np.intersect1d(no_back_cols, result.columns)]=-1
+    result.loc[result['view']=='belly', np.intersect1d(no_belly_cols, result.columns)]=-1
+    result.loc[result['view']=='side', np.intersect1d(no_side_cols, result.columns)]=-1
 
     if file_name is not None:
         result.to_csv(folder+file_name+".csv" , index =write_index)
     return result
 
-### Goal: write the evaluation on json
-# Params: gt_df: dataframe of ground truth. pred_coords [batch , lm_cnt * 2 ].
+def build_result_dict(result_dict= {},name = None,
+    pck = None, mean_pck = None, pck_threshold = None,
+    diff_per_pt=None, mean_diff_per_pt = None,
+    in_poly = None, mean_in_poly = None,
+    iou = None, mean_iou = None,
+    precision = None, mean_precision = None ):
+    """
+    Goals: write value into dictionry, the default value is None
+        which the dict can be used into grid searching result.
+    """
+
+    result_dict['name'] = name
+    result_dict['pck{}'.format(pck_threshold)] = pck
+    result_dict['mean_pck'] = mean_pck
+    result_dict['diff_per_pt'] = diff_per_pt
+    result_dict['mean_diff_per_pt'] = mean_diff_per_pt
+    result_dict['in_poly'] = in_poly
+    result_dict['mean_in_poly'] = mean_in_poly
+    result_dict['iou'] = iou
+    result_dict['mean_iou'] = mean_iou
+    result_dict['precision'] = precision
+    result_dict['mean_precision'] = mean_precision
+    result_dict = {str(k):str(v) for k,v in result_dict.items()}
+    return result_dict
+
+### Deprecate  ####
 
 def write_point_result(pred_coord , gt_coords,lm_cnt, params, folder):
     """
@@ -101,31 +125,6 @@ def write_point_result(pred_coord , gt_coords,lm_cnt, params, folder):
     f = open(folder+result_name,"w")
     f.write(json.dumps(result ,indent=2 , sort_keys=True))
     f.close()
-
-def build_result_dict(result_dict= {},name = None,
-    pck = None, mean_pck = None, pck_threshold = None,
-    diff_per_pt=None, mean_diff_per_pt = None,
-    in_poly = None, mean_in_poly = None,
-    iou = None, mean_iou = None,
-    precision = None, mean_precision = None ):
-    """
-    Goals: write value into dictionry, the default value is None
-        which the dict can be used into grid searching result.
-    """
-
-    result_dict['name'] = name
-    result_dict['pck{}'.format(pck_threshold)] = pck
-    result_dict['mean_pck'] = mean_pck
-    result_dict['diff_per_pt'] = diff_per_pt
-    result_dict['mean_diff_per_pt'] = mean_diff_per_pt
-    result_dict['in_poly'] = in_poly
-    result_dict['mean_in_poly'] = mean_in_poly
-    result_dict['iou'] = iou
-    result_dict['mean_iou'] = mean_iou
-    result_dict['precision'] = precision
-    result_dict['mean_precision'] = mean_precision
-    result_dict = {str(k):str(v) for k,v in result_dict.items()}
-    return result_dict
 
 ### Goal: Get the dictionray from params.
 # Used in write_point_result

@@ -10,6 +10,7 @@ import pandas as pd
 
 import sys, os
 import network
+from network import _help_func_dict
 import itertools
 
 from datetime import date
@@ -27,8 +28,12 @@ from points_util import heatmap_to_coord
 from points_metrics import *
 from points_io import write_pred_dataframe, build_result_dict
 
-print('--Parsing Config File')
-config_name = 'config_train.cfg'
+args = sys.argv
+if len(args)==2:
+    config_name = args[1]
+else:
+    config_name = 'config_train.cfg'
+print('--Parsing Config File: {}'.format(config_name))
 
 params = process_config(os.path.join(dirname, config_name))
 grid_params = generate_grid_params(params)
@@ -68,12 +73,14 @@ if bool(grid_params):
         train_data = data_input.plumage_data_input(df_train,batch_size=params['batch_size'],is_train =params['is_train'],
                                    pre_path =params['img_folder'],state=params['data_state'],
                                    scale=params['scale'] ,is_aug = params['img_aug'],
-                                   heatmap_scale = params['output_stride'])
+                                   heatmap_scale = params['output_stride'],
+                                   view = params['category'])
         print("Read valid data ....\n")
         valid_data = data_input.plumage_data_input(df_valid,batch_size=params['batch_size'],is_train =params['is_train'],
                                    pre_path =params['img_folder'],state=params['data_state'],
                                    scale=params['scale'] ,is_aug = params['img_aug'],
-                                   heatmap_scale = params['output_stride'])
+                                   heatmap_scale = params['output_stride'],
+                                   view = params['category'])
 
         ##### Create the network using the hyperparameters. #####
         tf.reset_default_graph()
@@ -202,12 +209,6 @@ if bool(grid_params):
             pck = np.round(pck, 4), mean_pck = round(np.nanmean(pck), 4), pck_threshold = params['pck_threshold'],
             diff_per_pt=np.round(diff_per_pt, 4), mean_diff_per_pt = round(np.nanmean(diff_per_pt), 4))
 
-        # result_dict['mean_pck'] = round(np.nanmean(pck), 4)
-        # result_dict['mean_diff_per_pt'] = round(np.nanmean(diff_per_pt), 4)
-        # result_dict['pck{}'.format(params['pck_threshold'])] = np.round(pck, 4)
-        # result_dict['diff_per_pt'] = np.round(diff_per_pt, 4)
-
-        # result_dict = {str(k):str(v) for k,v in result_dict.items()}
         final_grid_df = final_grid_df.append(pd.DataFrame(result_dict, index=[id_grid]))
 
     final_grid_df.to_csv(params['valid_result_dir']+ "{}grid_search.csv".format(str(date.today())), index = False)    
