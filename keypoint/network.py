@@ -61,7 +61,7 @@ class Pose_Estimation:
             self.restart_decay_steps = config["first_decay_epoch"] * config["one_epoch_steps"]
             self.t_mul = _help_func_dict(config, 't_mul', 2.0)
             self.m_mul = _help_func_dict(config, 'm_mul', 1.0)
-        if self.is_train is True:
+        if self.is_train:
             self.optimizer = _help_func_dict(config, 'optimizer', "adam")
             self.start_learning_rate =config["learning_rate"]
             self.exponential_decay_step = config["exponential_decay_epoch"] * config["one_epoch_steps"]
@@ -74,10 +74,12 @@ class Pose_Estimation:
 
         print("\nInitialize the {} network.\n\tIs Training:{}\n\tInput shape: {}\n\tOutput shape: {}".format(self.network_name,
             self.is_train, self.images.shape.as_list(), self.labels.shape.as_list()))
-        print("#### configuration ######")
-        print("Optimizer: {}\tStart Learning rate: {}\tdecay_restart: {}".format(self.optimizer,
-         self.start_learning_rate, self.decay_restart) )
-        print("#### Network init finished ######\n")
+        
+        if self.is_train:
+            print("#### configuration ######")
+            print("Optimizer: {}\tStart Learning rate: {}\tdecay_restart: {}".format(self.optimizer,
+             self.start_learning_rate, self.decay_restart) )
+            print("#### Network init finished ######\n")
 ################### functions ##########
     def loss(self):
         """
