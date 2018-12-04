@@ -55,9 +55,16 @@ class Pose_Estimation:
             self.modif = False
 
 
+        # All learning rate decay is in `train_op(self, total_loss, global_step)`
+        self.decay_restart = config["decay_restart"]
+        if self.decay_restart is True:
+            self.restart_decay_steps = config["first_decay_epoch"] * config["one_epoch_steps"]
+            self.t_mul = _help_func_dict(config, 't_mul', 2.0)
+            self.m_mul = _help_func_dict(config, 'm_mul', 1.0)
         if self.is_train is True:
+            self.optimizer = _help_func_dict(config, 'optimizer', "adam")
             self.start_learning_rate =config["learning_rate"]
-            self.decay_step = config["decay_step"]
+            self.exponential_decay_step = config["exponential_decay_epoch"] * config["one_epoch_steps"]
             self.learning_rate_decay = config["learning_rate_decay"]
             
                     ## Summary configuration
@@ -67,7 +74,10 @@ class Pose_Estimation:
 
         print("\nInitialize the {} network.\n\tIs Training:{}\n\tInput shape: {}\n\tOutput shape: {}".format(self.network_name,
             self.is_train, self.images.shape.as_list(), self.labels.shape.as_list()))
-    
+        print("#### configuration ######")
+        print("Optimizer: {}\tStart Learning rate: {}\tdecay_restart: {}".format(self.optimizer,
+         self.start_learning_rate, self.decay_restart) )
+        print("#### Network init finished ######\n")
 ################### functions ##########
     def loss(self):
         """
@@ -105,14 +115,32 @@ class Pose_Estimation:
         # add loss into summary
         self._loss_summary(total_loss)
 
-        self.learning_rate = tf.train.exponential_decay(self.start_learning_rate, global_step,
-                                                   self.decay_step, self.learning_rate_decay, staircase=True)
+        #####The learning rate decay method
 
-        optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
+        if self.decay_restart:
+            # Cosine decay and restart
+            # print("decayn restart: {}".format(self.restart_decay_steps))
+            self.learning_rate = tf.train.cosine_decay_restarts(self.start_learning_rate, global_step,
+             self.restart_decay_steps, t_mul = self.t_mul , m_mul = self.m_mul)
+        else:
+            # exponential_decay
+            # print("expotineal decayn: {}".format(self.exponential_decay_step))
+            self.learning_rate = tf.train.exponential_decay(self.start_learning_rate, global_step,
+                                                       self.exponential_decay_step, self.learning_rate_decay, staircase=True)
+
+        ##### Select the optimizer
+        if self.optimizer == 'adam':
+            # print("adam")
+            optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
+        elif self.optimizer == 'sgd':
+            # print("sssssssssssssgd")
+            optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate)
+
         grads = optimizer.compute_gradients(total_loss)
 
         apply_gradient_op = optimizer.apply_gradients(grads, global_step=global_step)    
 
+        tf.summary.scalar("learning_rate", self.learning_rate, collections = ['train'])
         return apply_gradient_op
 
     ###存储与恢复参数checkpoint####
@@ -180,8 +208,8 @@ class Pose_Estimation:
         # self.point_pck = tf.placeholder(dtype = tf.float32,
         #  shape = (self.points_num,))        
         with tf.device(self.cpu):
-            if self.result_summary:
-                with tf.name_scope('train'):
+            with tf.name_scope('train'):
+                if self.result_summary:
                     self._fm_summary(pred_img)
                 # tf.summary.scalar("Training loss", self.loss_value, collections = ['train'])
             tf.summary.scalar("Valid loss", self.valid_loss, collections = ['valid'])

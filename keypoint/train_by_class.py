@@ -34,8 +34,9 @@ def read_csv(params):
     df_valid = pd.read_csv(params['valid_file'])
 
     #Sampling a sub set
-    df_train = df_train.sample(n=100,random_state=3)
-    df_valid = df_valid.sample(n=20,random_state=3)
+    if 'small_data' in params and params['small_data']:
+        df_train = df_train.sample(n=100,random_state=3)
+        df_valid = df_valid.sample(n=20,random_state=3)
 
     # Create the name using some of the configuratation.
     print(params['category'])
@@ -69,6 +70,18 @@ def create_data(params, df_train, df_valid):
 def trainining(params, train_data, valid_data):
 
     config_name = params['config_name']
+
+    #Calculate the training steps
+    train_data_size = train_data.df_size
+    one_epoch_steps = train_data_size//params['batch_size']
+    params["one_epoch_steps"] = one_epoch_steps
+    total_steps = (params['nepochs'] * train_data_size) //params['batch_size']
+    summary_steps =  total_steps // params['summary_interval']
+    valid_steps = total_steps // params['valid_interval']
+    saver_steps = total_steps // params['saver_interval']
+    print('Total steps: {}\nOne epoch: {}\nSum steps: {}, Valid steps: {}, Save steps: {}'.format(total_steps,one_epoch_steps,
+        summary_steps,valid_steps,saver_steps))
+
     tf.reset_default_graph()
     model = network.Pose_Estimation(params,train_data.img_width, train_data.img_height )
 
@@ -77,23 +90,12 @@ def trainining(params, train_data, valid_data):
     loss = model.loss()
     train_op = model.train_op(loss, model.global_step)
 
-
-    #Calculate the training steps
-    train_data_size = train_data.df_size
-    total_steps = (params['nepochs'] * train_data_size) //params['batch_size']
-    summary_steps =  total_steps // params['summary_interval']
-    valid_steps = total_steps // params['valid_interval']
-    saver_steps = total_steps // params['saver_interval']
-
     #File name and paths
     param_dir = params['saver_directory']
     logdir = os.path.join(params['log_dir'], config_name+str(date.today()))
     restore_file = params['restore_param_file']
     save_filename = "{}_{}".format(str(date.today()) ,params['name']) + config_name
     initialize = params['init']
-
-    print('Total steps: {}\nSum steps: {}, Valid steps: {}, Save steps: {}'.format(total_steps,
-        summary_steps,valid_steps,saver_steps))
 
     saver = tf.train.Saver()
     init_op = tf.global_variables_initializer()
@@ -233,7 +235,7 @@ args = sys.argv
 if len(args)==2:
     config_name = args[1]
 else:
-    config_name = 'config_train.cfg'
+    config_name = 'config_train_cpm.cfg'
 print('--Parsing Config File: {}'.format(config_name))
 
 params = process_config(os.path.join(dirname, config_name))

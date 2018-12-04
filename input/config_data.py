@@ -50,7 +50,7 @@ def return_coords_cols(view = 'all',no_standard = False, train_ids = None):
     else:
         idx_stand = range(0, 10)
 
-    if view == 'all':
+    if view == 'all' or view is None:
         idx = range(10, len(coords_cols_np))
     if view =='back':
         idx = range(10,20)
