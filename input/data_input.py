@@ -11,6 +11,7 @@ from scipy.ndimage import gaussian_filter
 import cv2
 
 import os, errno
+import random as rand_lib
 from random import randint,uniform,choice,random
 import math
 from PIL import ImageEnhance,ImageChops,ImageOps,ImageFilter
@@ -100,7 +101,7 @@ class plumage_data_input:
     #---- basic config ----
     file_name_col = 'file.vis'
     file_info_cols = ['file.vis', 'file.uv', 'view' , 'img.missing']
-
+    contour_col = ["poly.outline" ]
     # patches_cols = ['poly.crown' , 'poly.nape','poly.mantle', 'poly.rump', 'poly.tail',
     # 'poly.throat', 'poly.breast', 'poly.belly', 'poly.tail.underside',
     #  'poly.wing.coverts',   'poly.wing.primaries.secondaries']
@@ -137,15 +138,21 @@ class plumage_data_input:
             is_aug: Whether augment the data
             
         """
-
-        self.df  = df
+        self.df  = df.copy()
         self.pre_path = pre_path
         self.scale = scale
-        self.heatmap_scale = heatmap_scale
-        self.df_size = df.shape[0]
+        self.heatmap_scale = heatmap_scale    
         self.batch_size = batch_size
         self.is_train = is_train
         self.is_aug = is_aug
+        #
+        if self.is_aug:
+            # make data frame:
+            df2 = self.df.copy()
+            self.df.loc[:,'aug'] =False
+            df2.loc[:,'aug'] = True
+            self.df = pd.concat([self.df, df2]).reset_index(drop=True)
+        self.df_size = self.df.shape[0]
         
         self.all_columns = df.columns
         self.coords_cols = return_coords_cols(view = view , no_standard = no_standard, train_ids = train_ids)
@@ -157,17 +164,18 @@ class plumage_data_input:
         self.indices = np.arange(self.df_size)
         np.random.shuffle(self.indices)
         filepath_test = pre_path+df.loc[df.index[0],self.file_name_col]
+        print(filepath_test)
         img = cv2.imread(filepath_test)
 #         img = Image.open(filepath_test)
         self.img_width= img.shape[1]
         self.img_height = img.shape[0]
 
         print("Init data class...")
-        print("\tData shape: {}\n\tbatch_size:{}\n\tscale:{}\n\tImage original resolution: {}*{}\n\tscaled resolution: {}*{}"\
-            .format(self.df_size, self.batch_size,self.scale ,self.img_width , self.img_height, self.img_width//self.scale , self.img_height//self.scale))
+        print("\tOrignal Data shape: {}\n\tData shape: {}\n\tbatch_size:{}\n\tscale:{}\n\tImage original resolution: {}*{}\n\tscaled resolution: {}*{}"\
+            .format(df.shape[0],self.df_size, self.batch_size,self.scale ,self.img_width , self.img_height, self.img_width//self.scale , self.img_height//self.scale))
 
         print("Image Augmentation:{}\n\tAugmentation option:".format(self.is_aug, self.aug_option))
-        
+      
         
         assert state in self.STATE_OPTIONS, "State is not in {}".format(self.STATE_OPTIONS)
         self.state = state
@@ -576,46 +584,6 @@ class plumage_data_input:
         y_map = np.round(y_map,8)
         return y_map
 
-
-    def get_y_map_ori(self , df):
-        """
-        返回[m,64,64,landmark]的关键点热点图
-        """
-        scale = self.scale
-        l_m_columns = self.coords_cols
-        cols_num_per_coord = self.cols_num_per_coord
-
-        pad = int(self.img_width/5)
-        pad_half = int(pad/2)
-        gaus_sigma = 20
-        
-        y_coord = df[l_m_columns].as_matrix().astype(int)
-        lm_cnt = int(y_coord.shape[1]/cols_num_per_coord)
-        df_size = y_coord.shape[0]
-
-
-        height = int(self.img_height/(scale*8))
-        width = int(self.img_width/(scale*8))
-
-        y_map = np.zeros((df_size,height,width,lm_cnt))
-
-        for j in range(df_size):
-            for i in range(lm_cnt):
-
-                y_map_ori = np.zeros((self.img_height+pad,  self.img_width+pad))
-                x = y_coord[j,i*cols_num_per_coord]
-                y = y_coord[j,i*cols_num_per_coord+1]
-                # print(y_map_ori.shape , x, y)
-
-                if x!=-1 and y!=-1:
-                    y_map_ori[y + pad_half , x + pad_half] = 20000
-                    y_map_ori =  gaussian_filter(y_map_ori,sigma=gaus_sigma)
-                    y_map_ori = y_map_ori[pad_half:self.img_height+pad_half, pad_half:self.img_width+pad_half]
-                    y_map[j,:,:,i] = cv2.resize(y_map_ori, dsize=(width, height),interpolation = cv2.INTER_NEAREST)
-                    # y_map[j,y,x,i]=1
-        y_map = np.round(y_map,8)
-        #print(y_map.shape)
-        return y_map
     def get_y_vis_map(self ,df):
         """
         Goal: return a series of masks for each key points
@@ -662,21 +630,22 @@ class plumage_data_input:
 
         img_id=0
         for idx,row in df.iterrows(): 
+            
+            
+            ## Read images
             filename = folder+row[self.file_name_col]
             img = cv2.imread(filename)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             img_hei = img.shape[0]
             img_wid = img.shape[1]
-#             img = cv2.resize(img, dsize=(width,height), interpolation=cv2.INTER_CUBIC)
-            aug_prob = random()
-            if aug_prob > 0.5:
-                
-                
+            if row['aug']==True:    
+                # Make sure the transformation for each is same.
+                rand_lib.seed(idx)            
                 #-----Translate----
                 if self.aug_option['trans']:
-#                 if False:
-                    min_offset = 0
-                    max_offset = 1000
+    #                 if False:
+                    min_offset = 100
+                    max_offset = 800
                     trans_lr = choice([randint(min_offset,max_offset) , randint(-max_offset,-min_offset)] ) #left/right (i.e. 5/-5)
 
                     trans_ud = choice([randint(min_offset,max_offset) , randint(-max_offset,-min_offset)] ) #up/down (i.e. 5/-5)
@@ -692,7 +661,7 @@ class plumage_data_input:
                             row[id_y] = row[id_y] + trans_ud
                             inside = row[id_x]>self.img_width or row[id_x]<0 or row[id_y]>self.img_height or row[id_y]<0 
                             if inside:
-#                                 print(idx, "outside")
+    #                                 print(idx, "outside")
                                 trans_lr=0
                                 trans_ud = 0
                                 row= old_row
@@ -700,21 +669,41 @@ class plumage_data_input:
                     M = np.float32([[1,0,trans_lr],[0,1,trans_ud]])
 
                     img = cv2.warpAffine(img,M,(img_wid,img_hei))
-    #                 img = img.transform(img.size, Image.AFFINE, (1, 0, trans_lr, 0, 1, trans_ud))
 
+                ##-----Scale------
+                if self.aug_option['scale']:
+    #                 if False:
+                    #scale value:
+                    scale_ratio = randint(10,15)/10
+    #                     scale_ratio = 1.5
+                    new_scaled_width = (int(self.img_width/scale_ratio))
+                    new_scaled_height = (int(self.img_height/scale_ratio))
 
-                
-                
+                    img = cv2.resize(img, dsize=(new_scaled_width,new_scaled_height),
+                                     interpolation=cv2.INTER_CUBIC)
+                    delta_w = self.img_width - new_scaled_width
+                    delta_h = self.img_height - new_scaled_height
+
+                    img= cv2.copyMakeBorder(img,delta_h//2,delta_h-(delta_h//2),
+                                            delta_w//2,delta_w-(delta_w//2),
+                                            cv2.BORDER_CONSTANT,value=[0,0,0])
+
+                    for i in np.arange(0,len(l_m_columns),self.cols_num_per_coord):
+                        id_x = l_m_columns[i]
+                        id_y = l_m_columns[i+1]
+                        id_vis = l_m_columns[i]
+                        if row[id_vis] !=-1:
+                            row[id_x] = (row[id_x] )//scale_ratio+ delta_w//2
+                            row[id_y] = (row[id_y])//scale_ratio + delta_h//2
                 # ---------Rotate--------
                 if self.aug_option['rot']:
-#                 if False:    
+    #                 if False:    
                     angle_bound = 30
                     angle = randint(-angle_bound,angle_bound)
-#                     angle =15
                     radian = math.pi/180*angle
 
                     old_row = row.copy()
-                    
+
                     for i in np.arange(0,len(l_m_columns),self.cols_num_per_coord):
                         id_x = l_m_columns[i]
                         id_y = l_m_columns[i+1]
@@ -729,45 +718,13 @@ class plumage_data_input:
                             row[id_y] =int ((self.img_height-(row[id_y]+self.img_height/2 )))
                             inside = row[id_x]>self.img_width or row[id_x]<0 or row[id_y]>self.img_height or row[id_y]<0 
                             if inside:
-#                                 print(idx, "outside")
+    #                                 print(idx, "outside")
                                 angle=0
-                                
+
                                 row= old_row
                                 break
                     M = cv2.getRotationMatrix2D((img_wid/2,img_hei/2),angle,1)
                     img = cv2.warpAffine(img,M,(img_wid,img_hei))
-#                     img = img.rotate(angle)
-                
-                
-                ##-----Scale------
-                if self.aug_option['scale']:
-#                 if False:
-                    #scale value:
-                    scale_ratio = randint(10,15)/10
-#                     scale_ratio = 1.5
-                    new_scaled_width = (int(self.img_width/scale_ratio))
-                    new_scaled_height = (int(self.img_height/scale_ratio))
-                    
-                    img = cv2.resize(img, dsize=(new_scaled_width,new_scaled_height),
-                                     interpolation=cv2.INTER_CUBIC)
-                    delta_w = self.img_width - new_scaled_width
-                    delta_h = self.img_height - new_scaled_height
-                    
-                    img= cv2.copyMakeBorder(img,delta_h//2,delta_h-(delta_h//2),
-                                            delta_w//2,delta_w-(delta_w//2),
-                                            cv2.BORDER_CONSTANT,value=[0,0,0])
-                    
-                    for i in np.arange(0,len(l_m_columns),self.cols_num_per_coord):
-                        id_x = l_m_columns[i]
-                        id_y = l_m_columns[i+1]
-                        id_vis = l_m_columns[i]
-                        if row[id_vis] !=-1:
-                            row[id_x] = (row[id_x] )//scale_ratio+ delta_w//2
-                            row[id_y] = (row[id_y])//scale_ratio + delta_h//2
-
-
-#                 img[...,2]+100
-                    
                 #---Intensity and enhance---#
                 if False:
                     aug_type = randint(0,3)

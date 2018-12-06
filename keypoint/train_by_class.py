@@ -60,7 +60,7 @@ def create_data(params, df_train, df_valid):
     print("Read valid data ....\n")
     valid_data = data_input.plumage_data_input(df_valid,batch_size=params['batch_size'],is_train =params['is_train'],
                                pre_path =params['img_folder'],state=params['data_state'],
-                               scale=params['scale'] ,is_aug = params['img_aug'],
+                               scale=params['scale'] ,is_aug = False,
                                heatmap_scale = params['output_stride'],
                                 view = params['category'],no_standard = _help_func_dict(params,"no_standard",False) )
     params['points_num'] = train_data.lm_cnt
