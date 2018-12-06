@@ -55,13 +55,14 @@ class Pose_Estimation:
             self.modif = False
 
 
-        # All learning rate decay is in `train_op(self, total_loss, global_step)`
-        self.decay_restart = config["decay_restart"]
-        if self.decay_restart is True:
-            self.restart_decay_steps = config["first_decay_epoch"] * config["one_epoch_steps"]
-            self.t_mul = _help_func_dict(config, 't_mul', 2.0)
-            self.m_mul = _help_func_dict(config, 'm_mul', 1.0)
+
         if self.is_train:
+        # All learning rate decay is in `train_op(self, total_loss, global_step)`
+            self.decay_restart = config["decay_restart"]
+            if self.decay_restart is True:
+                self.restart_decay_steps = config["first_decay_epoch"] * config["one_epoch_steps"]
+                self.t_mul = _help_func_dict(config, 't_mul', 2.0)
+                self.m_mul = _help_func_dict(config, 'm_mul', 1.0)            
             self.optimizer = _help_func_dict(config, 'optimizer', "adam")
             self.start_learning_rate =config["learning_rate"]
             self.exponential_decay_step = config["exponential_decay_epoch"] * config["one_epoch_steps"]
@@ -138,9 +139,13 @@ class Pose_Estimation:
             # print("sssssssssssssgd")
             optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate)
 
-        grads = optimizer.compute_gradients(total_loss)
+        # grads = optimizer.compute_gradients(total_loss)
+        # apply_gradient_op = optimizer.apply_gradients(grads, global_step=global_step)  
+          
+        self.update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        with tf.control_dependencies(self.update_ops):
+            apply_gradient_op = optimizer.minimize(total_loss, global_step)
 
-        apply_gradient_op = optimizer.apply_gradients(grads, global_step=global_step)    
 
         tf.summary.scalar("learning_rate", self.learning_rate, collections = ['train'])
         return apply_gradient_op

@@ -35,15 +35,16 @@ df_pred = pd.read_csv(params['pred_file'])
 # df_pred = df_pred.sample(n=30,random_state=3)
 # Create the name using some of the configuratation.
 print(params['category'])
-if params['category'] is not None:
+if params['category'] is not None and params['category'] !='all':
     params['name'] +='_' + params['category']
-    df_pred = df_pred.loc[df_pred.view==params["category"],:].reset_index(drop = True)
-elif params['category'] is None or params['category'] =='all':
+    df_train = df_train.loc[df_train.view==params["category"],:].reset_index(drop = True)
+    df_valid = df_valid.loc[df_valid.view==params["category"],:].reset_index(drop = True)
+else:
     params['name'] +='_' + 'all'
 
 
 print("Read training data ....")
-pred_data = data_input.plumage_data_input(df_pred,batch_size=params['batch_size'],is_train =params['is_train'],
+pred_data = data_input.plumage_data_input(df_pred,batch_size=params['batch_size'],is_train =False,
                            pre_path =params['img_folder'],state=params['data_state'],
                            scale=params['scale'] ,is_aug = params['img_aug'],
                            heatmap_scale = params['output_stride'])
@@ -53,6 +54,10 @@ if 'is_valid' in params:
     is_valid = params['is_valid']
 else:
     is_valid = False
+
+pred_data_size = pred_data.df_size
+one_epoch_steps = pred_data_size//params['batch_size']
+params["one_epoch_steps"] = one_epoch_steps
 
 ##### Create the network using the hyperparameters. #####
 tf.reset_default_graph()
