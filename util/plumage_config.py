@@ -44,7 +44,7 @@ def generate_grid_params(params):
         'learning_rate','learning_rate_decay', 'exponential_decay_epoch',
         'decay_restart', 'first_decay_epoch', 'optimizer',
         'batch_size', 'l2','dropout_rate', 
-        'nlow','nstacks','output_stride']
+        'nlow','nstacks','output_stride','split_seed']
     grid_params = {}
 
     for key in keys:
@@ -57,7 +57,7 @@ def generate_grid_params(params):
 def extract_config_name(params):
     keys = ['scale' , 'is_grey' , 'img_aug',
         'learning_rate','batch_size', 'l2','dropout_rate', 
-        'output_stride', 'optimizer', 'decay_restart']
+        'output_stride', 'optimizer', 'decay_restart','split_seed']
     params['config_name'] = ""
     for key in keys:
         if key in params.keys():

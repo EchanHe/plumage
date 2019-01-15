@@ -12,6 +12,7 @@ import sys, os
 import network
 from network import _help_func_dict
 import itertools
+from sklearn.model_selection import train_test_split
 
 from datetime import date
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1' 
@@ -29,9 +30,20 @@ from points_metrics import *
 from points_io import write_pred_dataframe, build_result_dict
 
 def read_csv(params):
-    ##reading data###
-    df_train = pd.read_csv(params['train_file'])
-    df_valid = pd.read_csv(params['valid_file'])
+    ##reading data
+    df_all = pd.read_csv(params['input_file'])
+    gb = df_all.groupby("view")
+    split_list = [t for x in gb.groups for t in train_test_split(gb.get_group(x),
+     test_size=params['test_size'], random_state =params['split_seed'])]
+    
+    df_train = pd.concat(split_list[0::2],sort = False)
+    df_valid = pd.concat(split_list[1::2],sort = False)
+
+
+
+    # ##reading data###
+    # df_train = pd.read_csv(params['train_file'])
+    # df_valid = pd.read_csv(params['valid_file'])
 
     #Sampling a sub set
     if 'small_data' in params and params['small_data']:
@@ -235,7 +247,7 @@ args = sys.argv
 if len(args)==2:
     config_name = args[1]
 else:
-    config_name = 'config_train_cpm.cfg'
+    config_name = 'config_train_hg.cfg'
 print('--Parsing Config File: {}'.format(config_name))
 
 params = process_config(os.path.join(dirname, config_name))
@@ -243,7 +255,7 @@ grid_params = generate_grid_params(params)
 print(grid_params)
 
 
-df_train,df_valid = read_csv(params)
+
 # lr_list = np.empty([0])
 ################
 if bool(grid_params):
@@ -257,7 +269,7 @@ if bool(grid_params):
         for key, value in zip(keys, v_pert):
             params[key] = value
             config_name += "{}-{};".format(key,value)
-
+        df_train,df_valid = read_csv(params)
         train_data, valid_data = create_data(params, df_train,df_valid)    
 
         ##### Create the network using the hyperparameters. #####
