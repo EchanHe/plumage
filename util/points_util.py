@@ -57,3 +57,47 @@ def pred_coords_to_patches(pred_coords , half_width =10, half_height=10 , ignore
             patch_coords = [l_x,u_y,u_x,u_y,u_x,l_y,l_x,l_y]
             pred_patches[i, j] = ','.join(str(int(c)) for c in patch_coords )
     return pred_patches
+
+
+
+#return a matrix of rectangle x,y strings in [batch, n_patches]
+def create_rect_on_coords(coords , width =10, height=10 , ignore_coords =10):
+    """
+    Goal: a N_D array of rectangle using coords as center 
+
+    params:
+        coords: [batch, x1,y1,..., xn,yn]
+
+    return:
+        x,y strings in [batch, n_patches]
+    """
+
+    # coords = coords[:,ignore_coords:]
+
+    total_patches = coords.shape[-1]//2
+    x_coords = coords[:,range(0,total_patches*2,2)]
+    y_coords = coords[:,range(1,total_patches*2,2)]
+
+    half_width = width//2
+    half_height = height //2
+
+    upper_x_coords = x_coords + half_width
+    upper_y_coords = y_coords + half_height
+    lower_x_coords = x_coords - half_width
+    lower_y_coords = y_coords - half_height
+
+    pred_patches = np.empty((coords.shape[0] , total_patches) , dtype = object)
+
+    # [coords+4000 , coords-4000 ]
+    # y_coords.astype(str) 
+    ## Make 4 verticies of a rectangle near the centric.
+    for i in range(coords.shape[0]):
+        for j in range(total_patches):
+            u_x = upper_x_coords[i,j]
+            u_y = upper_y_coords[i,j]
+            l_x = lower_x_coords[i,j]
+            l_y = lower_y_coords[i,j]
+            patch_coords = [l_x,u_x,l_y,u_y]
+            pred_patches[i, j] = ','.join(str(int(c)) for c in patch_coords )
+    pred_patches[x_coords == -1] =-1
+    return pred_patches

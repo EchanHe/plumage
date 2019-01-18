@@ -1,14 +1,22 @@
 import numpy as np
 import pandas as pd
 
+# coords_cols = ['s02.standard_x', 's02.standard_y', 's20.standard_x', 's20.standard_y',
+# 's40.standard_x', 's40.standard_y', 's80.standard_x', 's80.standard_y',
+# 's99.standard_x', 's99.standard_y','crown_x', 'crown_y', 'nape_x',
+# 'nape_y', 'mantle_x', 'mantle_y', 'rump_x', 'rump_y', 'tail_x',
+# 'tail_y', 'throat_x', 'throat_y', 'breast_x', 'breast_y', 'belly_x',
+# 'belly_y', 'tail.underside_x', 'tail.underside_y', 'wing.coverts_x',
+# 'wing.coverts_y', 'wing.primaries.secondaries_x',
+# 'wing.primaries.secondaries_y']
+
 coords_cols = ['s02.standard_x', 's02.standard_y', 's20.standard_x', 's20.standard_y',
 's40.standard_x', 's40.standard_y', 's80.standard_x', 's80.standard_y',
 's99.standard_x', 's99.standard_y','crown_x', 'crown_y', 'nape_x',
 'nape_y', 'mantle_x', 'mantle_y', 'rump_x', 'rump_y', 'tail_x',
 'tail_y', 'throat_x', 'throat_y', 'breast_x', 'breast_y', 'belly_x',
-'belly_y', 'tail.underside_x', 'tail.underside_y', 'wing.coverts_x',
-'wing.coverts_y', 'wing.primaries.secondaries_x',
-'wing.primaries.secondaries_y']
+'belly_y', 'coverts_x', 'coverts_y', 'flight_feathers_x',
+'flight_feathers_y']
 
 patches_cols = ['poly.crown' , 'poly.nape','poly.mantle', 'poly.rump', 'poly.tail',
     'poly.throat', 'poly.breast', 'poly.belly', 'poly.tail.underside',
@@ -55,9 +63,9 @@ def return_coords_cols(view = 'all',no_standard = False, train_ids = None):
     if view =='back':
         idx = range(10,20)
     if view =='belly':
-        idx = range(20,28)
+        idx = range(20,26)
     if view == 'side':
-        idx = range(28,32)
+        idx = range(26,30)
 
     idx = np.union1d(idx, idx_stand)
 

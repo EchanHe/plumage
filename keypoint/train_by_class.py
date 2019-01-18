@@ -159,7 +159,6 @@ def trainining(params, train_data, valid_data):
                 #write the validation result
 
                 loss_list = np.array([])
-                # _prediction = np.zeros((0,predict.shape[1], predict.shape[2], predict.shape[3]))
                 pred_coords = np.zeros((0, 2*model.points_num))
                 for i_df_valid in np.arange(0,valid_data.df.shape[0],valid_data.batch_size):
                     img_mini, heatmap_mini,coords_mini , vis_mini = valid_data.get_next_batch_no_random()
@@ -173,16 +172,16 @@ def trainining(params, train_data, valid_data):
 
                     pred_coord_mini = heatmap_to_coord(_prediction_mini , valid_data.img_width, valid_data.img_height)
                     pred_coords = np.vstack((pred_coords, pred_coord_mini))    
-                    # _prediction = np.vstack([_prediction,sess.run(predict, feed_dict=feed_dict)])
                 pred_coords = pred_coords[:valid_data.df_size,...]    
                 gt_coords = valid_data.df[valid_data.coords_cols].values
-                # pred_coord = heatmap_to_coord(_prediction , valid_data.img_width , valid_data.img_height)
-                
+
                 diff_per_pt ,pck= pck_accuracy(pred_coords , gt_coords,
                     lm_cnt = valid_data.lm_cnt , pck_threshold = params['pck_threshold'],scale = 1)
-
+                ave_diff = np.nanmean(diff_per_pt)
                 summary = sess.run(model.valid_summary,
-                    feed_dict = {model.point_acc:diff_per_pt,model.valid_loss:np.mean(loss_list)})
+                    feed_dict = { model.point_acc:diff_per_pt, 
+                                    model.valid_loss:np.mean(loss_list),
+                                    model.ave_pts_diff:ave_diff})
                 writer.add_summary(summary , tmp_global_step)  
             ####### Save the parameters to computers.
             if (i + 1) % saver_steps == 0:        
@@ -230,6 +229,9 @@ def get_and_eval_result(params, valid_data):
     diff_per_pt ,pck= pck_accuracy(pred_coords , gt_coords,
             lm_cnt = valid_data.lm_cnt , pck_threshold = params_valid['pck_threshold'],scale = 1)
 
+
+
+
     write_pred_dataframe(valid_data , pred_coords ,
         folder = params_valid['valid_result_dir']+"grid_temp/",
         file_name = str(date.today()) + params_valid['config_name'],
@@ -256,7 +258,7 @@ print(grid_params)
 
 
 
-# lr_list = np.empty([0])
+# Trainning and validation
 ################
 if bool(grid_params):
 

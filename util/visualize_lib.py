@@ -232,11 +232,12 @@ def show_markups(imgs , pred_coords = None , pred_patches =None , pred_contours=
             if not os.path.exists(save_path):
                 os.makedirs(save_path)
             fig.savefig(save_path+image_name+"_{}.jpg".format(i_start))
-        plt.close(fig)
+        plt.close("all")
+        fig.clf()
 
 
 def show_one_markup(plt, img, pred_coord , pred_patch , pred_contour,
-    gt_coord  , gt_patch, gt_contour,pck_threshold, fig_name = "" , LM_CNT =16):
+    gt_coord  , gt_patch, gt_contour,pck_threshold, fig_name = "" , LM_CNT =16, save_path = None):
     """
     Plot one image and markup using show_coords and show_patches
 
@@ -259,9 +260,21 @@ def show_one_markup(plt, img, pred_coord , pred_patch , pred_contour,
     show_patches(plt, gt_patch, 'red')
     show_patches(plt, gt_contour , 'red', is_patch = False)
     show_coords(plt, gt_coord, pck_threshold, 'red' , LM_CNT)
+    
+    if save_path is not None:
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        plt.savefig(save_path + fig_name)
+        plt.close("all")
+        plt.clf()
 
 patches_names = ['s1','s2','s3','s4','s5', 'crown', 'nape','mantle', 'rump', 'tail',
 'throat', 'breast', 'belly', 'tail\nunderside',
+  'wing\ncoverts',   'wing\nprimaries\nsecondaries',]
+
+
+patches_names = ['s1','s2','s3','s4','s5', 'crown', 'nape','mantle', 'rump', 'tail',
+'throat', 'breast', 'belly', 
   'wing\ncoverts',   'wing\nprimaries\nsecondaries',]
 
 def show_coords(plt, coord ,pck_threshold = None, color = 'cyan' , LM_CNT = 16):

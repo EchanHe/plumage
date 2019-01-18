@@ -212,6 +212,8 @@ class Pose_Estimation:
         self.point_acc = tf.placeholder(dtype = tf.float32,
          shape = (self.points_num,))
         self.valid_loss = tf.placeholder(dtype = tf.float32)
+
+        self.ave_pts_diff = tf.placeholder(dtype = tf.float32)
         # self.point_pck = tf.placeholder(dtype = tf.float32,
         #  shape = (self.points_num,))        
         with tf.device(self.cpu):
@@ -219,7 +221,8 @@ class Pose_Estimation:
                 if self.result_summary:
                     self._fm_summary(pred_img)
                 # tf.summary.scalar("Training loss", self.loss_value, collections = ['train'])
-            tf.summary.scalar("Valid loss", self.valid_loss, collections = ['valid'])
+            tf.summary.scalar("Valid_loss", self.valid_loss, collections = ['valid'])
+            tf.summary.scalar("Valid_ave_accuracy", self.ave_pts_diff, collections = ['valid'])
             with tf.name_scope('valid'):
                 for i in range(self.points_num):
                      tf.summary.scalar("points/" + self.point_names[i], 

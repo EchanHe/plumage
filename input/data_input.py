@@ -336,7 +336,7 @@ class plumage_data_input:
         else:
             return x_mini
    
-
+    ## Get all labels from the data.
     def get_next_batch_no_random_all_labels(self):
         batch_size = self.batch_size
         df_size = self.df_size
@@ -349,12 +349,37 @@ class plumage_data_input:
         else: 
             df_mini = self.df.iloc[self.start_idx : self.start_idx+batch_size]
         x_mini = self.get_x_img(df_mini)
-        coords_mini = self.get_y_coord(df_mini , self.scale , True)
-        p_coords_mini = self.get_contour_patches_coords(df_mini , mode = 'patches' )
-        c_coords_mini = self.get_contour_patches_coords(df_mini , mode = 'contour')
+        try:
+            coords_mini = self.get_y_coord(df_mini , self.scale , True)
+        except:
+            coords_mini = None
+        try:
+            p_coords_mini = self.get_contour_patches_coords(df_mini , mode = 'patches' )
+        except:
+            p_coords_mini = None
+        try:
+            c_coords_mini = self.get_contour_patches_coords(df_mini , mode = 'contour')
+        except:
+            c_coords_mini = None
         self.start_idx += batch_size
         return x_mini, coords_mini , p_coords_mini, c_coords_mini
-        
+   
+        ## Get all labels from the data.
+    def get_next_batch_no_random_img_only(self):
+        batch_size = self.batch_size
+        df_size = self.df_size
+        is_train = self.is_train
+
+        if self.start_idx>=df_size:
+            self.start_idx = 0
+        if self.start_idx >= (df_size - batch_size+1):
+            df_mini = self.df.iloc[self.start_idx : ]
+        else: 
+            df_mini = self.df.iloc[self.start_idx : self.start_idx+batch_size]
+        x_mini = self.get_x_img(df_mini)
+        self.start_idx += batch_size
+        return x_mini
+
     def get_next_batch_no_random_all_labels_without_img(self):
         batch_size = self.batch_size
         df_size = self.df_size
@@ -367,9 +392,18 @@ class plumage_data_input:
         else: 
             df_mini = self.df.iloc[self.start_idx : self.start_idx+batch_size]
 
-        coords_mini = self.get_y_coord(df_mini , self.scale , True)
-        p_coords_mini = self.get_contour_patches_coords(df_mini , mode = 'patches' )
-        c_coords_mini = self.get_contour_patches_coords(df_mini , mode = 'contour')
+        try:
+            coords_mini = self.get_y_coord(df_mini , self.scale , True)
+        except:
+            coords_mini = None
+        try:
+            p_coords_mini = self.get_contour_patches_coords(df_mini , mode = 'patches' )
+        except:
+            p_coords_mini = None
+        try:
+            c_coords_mini = self.get_contour_patches_coords(df_mini , mode = 'contour')
+        except:
+            c_coords_mini = None
         self.start_idx += batch_size
         return coords_mini , p_coords_mini, c_coords_mini
     
