@@ -46,7 +46,8 @@ def write_pred_dataframe(valid_data , pred_coord , folder,file_name , patches_co
     if not os.path.exists(folder):
         os.makedirs(folder)
 
-
+    gt_coords = valid_data.df[valid_data.coords_cols].values
+    pred_coord[gt_coords==-1] = -1
     # Write the polygons in if there is given patches_coord
     # Other wise assign all -1.
     if patches_coord is None:
@@ -55,9 +56,9 @@ def write_pred_dataframe(valid_data , pred_coord , folder,file_name , patches_co
     p_result = pd.DataFrame(patches_coord, columns = valid_data.patches_cols)
     result = pd.concat([df_file_names,result,p_result],axis=1)
 
-    result.loc[result['view']=='back', np.intersect1d(no_back_cols, result.columns)]=-1
-    result.loc[result['view']=='belly', np.intersect1d(no_belly_cols, result.columns)]=-1
-    result.loc[result['view']=='side', np.intersect1d(no_side_cols, result.columns)]=-1
+    # result.loc[result['view']=='back', np.intersect1d(no_back_cols, result.columns)]=-1
+    # result.loc[result['view']=='belly', np.intersect1d(no_belly_cols, result.columns)]=-1
+    # result.loc[result['view']=='side', np.intersect1d(no_side_cols, result.columns)]=-1
 
     if file_name is not None:
         result.to_csv(folder+file_name+".csv" , index =write_index)

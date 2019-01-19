@@ -255,11 +255,11 @@ def show_one_markup(plt, img, pred_coord , pred_patch , pred_contour,
     # Show the predict mark and pred_patch
     show_patches(plt, pred_patch)
     show_patches(plt, pred_contour , is_patch = False)
-    show_coords(plt, pred_coord ,LM_CNT)
+    show_coords(plt, pred_coord , LM_CNT = LM_CNT)
 
     show_patches(plt, gt_patch, 'red')
     show_patches(plt, gt_contour , 'red', is_patch = False)
-    show_coords(plt, gt_coord, pck_threshold, 'red' , LM_CNT)
+    show_coords(plt, gt_coord, pck_threshold, 'red' , LM_CNT = LM_CNT)
     
     if save_path is not None:
         if not os.path.exists(save_path):

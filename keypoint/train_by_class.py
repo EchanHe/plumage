@@ -157,7 +157,6 @@ def trainining(params, train_data, valid_data):
             if (i+1) % valid_steps ==0 or i == 0:
                 #Validation part
                 #write the validation result
-
                 loss_list = np.array([])
                 pred_coords = np.zeros((0, 2*model.points_num))
                 for i_df_valid in np.arange(0,valid_data.df.shape[0],valid_data.batch_size):
@@ -188,6 +187,7 @@ def trainining(params, train_data, valid_data):
                 tmp_global_step = model.global_step.eval()
                 epochs = (tmp_global_step*params["batch_size"])//train_data_size
                 model.save(sess, saver, save_filename,epochs)  
+
         params['restore_param_file'] = "{}-{}".format(save_filename, epochs)
     return model, predict    
 
@@ -226,9 +226,22 @@ def get_and_eval_result(params, valid_data):
         pred_coords = pred_coords[:valid_data.df_size,...]    
 
     gt_coords = valid_data.df[valid_data.coords_cols].values
+
+    ## Create patches and calculate the pixels inside the patch and correlation.
+    
+
     diff_per_pt ,pck= pck_accuracy(pred_coords , gt_coords,
             lm_cnt = valid_data.lm_cnt , pck_threshold = params_valid['pck_threshold'],scale = 1)
 
+    _ ,pck_50= pck_accuracy(pred_coords , gt_coords,
+            lm_cnt = valid_data.lm_cnt , pck_threshold = 50,scale = 1)
+    _ ,pck_150= pck_accuracy(pred_coords , gt_coords,
+            lm_cnt = valid_data.lm_cnt , pck_threshold = 150,scale = 1)
+    _ ,pck_200= pck_accuracy(pred_coords , gt_coords,
+            lm_cnt = valid_data.lm_cnt , pck_threshold = 200,scale = 1)
+    _ ,pck_300= pck_accuracy(pred_coords , gt_coords,
+            lm_cnt = valid_data.lm_cnt , pck_threshold = 300,scale = 1)
+    # Try different dimension of rectangle
 
 
 
@@ -240,6 +253,11 @@ def get_and_eval_result(params, valid_data):
     result_dict = build_result_dict(result_dict = params_valid,
         pck = np.round(pck, 4), mean_pck = round(np.nanmean(pck), 4), pck_threshold = params_valid['pck_threshold'],
         diff_per_pt=np.round(diff_per_pt, 4), mean_diff_per_pt = round(np.nanmean(diff_per_pt), 4))
+
+    result_dict['pck_50'] = pck_50
+    result_dict['pck_150'] = pck_150
+    result_dict['pck_200'] = pck_200
+    result_dict['pck_300'] = pck_300
 
     return result_dict, pred_coords
 
