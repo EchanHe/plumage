@@ -15,7 +15,7 @@ import itertools
 from sklearn.model_selection import train_test_split
 
 from datetime import date
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1' 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0' 
 
 
 dirname = os.path.dirname(__file__)
@@ -104,7 +104,7 @@ def trainining(params, train_data, valid_data):
 
     #File name and paths
     param_dir = params['saver_directory']
-    logdir = os.path.join(params['log_dir'], config_name+str(date.today()))
+    logdir = os.path.join(params['log_dir'], str(date.today()) + config_name)
     restore_file = params['restore_param_file']
     save_filename = "{}_{}".format(str(date.today()) ,params['name']) + config_name
     initialize = params['init']
@@ -142,17 +142,13 @@ def trainining(params, train_data, valid_data):
             sess.run(train_op, feed_dict=feed_dict)
 
             ###### Train Summary part #####
-            if (i+1) % summary_steps == 0 or i == 0:
+            if (i+1) % summary_steps== 0 or i == 0:
                 print("{} steps Loss: {}".format(i+1,sess.run(loss, feed_dict=feed_dict)))
                 lear = model.learning_rate.eval()
-    #             print("\tGlobal steps and learning rates: {}  {}".format(tmp_global_step,lear))
-
-                result_train=sess.run(predict, feed_dict=feed_dict)
-
+                # print("\tGlobal steps and learning rates: {}  {}".format(tmp_global_step,lear))
                 temp_summary = sess.run(train_summary, feed_dict=feed_dict)    
                 writer.add_summary(temp_summary, tmp_global_step)
                 # lr_list = np.append(lr_list, loss.eval(feed_dict=feed_dict))
-                
             ######Validating the result part#####    
             if (i+1) % valid_steps ==0 or i == 0:
                 #Validation part
@@ -228,7 +224,6 @@ def get_and_eval_result(params, valid_data):
     gt_coords = valid_data.df[valid_data.coords_cols].values
 
     ## Create patches and calculate the pixels inside the patch and correlation.
-    
 
     diff_per_pt ,pck= pck_accuracy(pred_coords , gt_coords,
             lm_cnt = valid_data.lm_cnt , pck_threshold = params_valid['pck_threshold'],scale = 1)
@@ -252,12 +247,9 @@ def get_and_eval_result(params, valid_data):
 
     result_dict = build_result_dict(result_dict = params_valid,
         pck = np.round(pck, 4), mean_pck = round(np.nanmean(pck), 4), pck_threshold = params_valid['pck_threshold'],
-        diff_per_pt=np.round(diff_per_pt, 4), mean_diff_per_pt = round(np.nanmean(diff_per_pt), 4))
+        diff_per_pt=np.round(diff_per_pt, 4), mean_diff_per_pt = round(np.nanmean(diff_per_pt), 4),
+        pck_50 = pck_50, pck_150 = pck_150 , pck_200 = pck_200 , pck_300 = pck_300)
 
-    result_dict['pck_50'] = pck_50
-    result_dict['pck_150'] = pck_150
-    result_dict['pck_200'] = pck_200
-    result_dict['pck_300'] = pck_300
 
     return result_dict, pred_coords
 
@@ -267,7 +259,7 @@ args = sys.argv
 if len(args)==2:
     config_name = args[1]
 else:
-    config_name = 'config_train_hg.cfg'
+    config_name = 'config_train_cpm.cfg'
 print('--Parsing Config File: {}'.format(config_name))
 
 params = process_config(os.path.join(dirname, config_name))

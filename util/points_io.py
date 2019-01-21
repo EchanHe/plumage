@@ -69,7 +69,8 @@ def build_result_dict(result_dict= {},name = None,
     diff_per_pt=None, mean_diff_per_pt = None,
     in_poly = None, mean_in_poly = None,
     iou = None, mean_iou = None,
-    precision = None, mean_precision = None ):
+    precision = None, mean_precision = None,
+    pck_50 = None, pck_150 = None, pck_200 = None, pck_300 = None ):
     """
     Goals: write value into dictionry, the default value is None
         which the dict can be used into grid searching result.
@@ -90,6 +91,11 @@ def build_result_dict(result_dict= {},name = None,
     result_dict['mean_iou'] = mean_iou
     result_dict['precision'] = precision
     result_dict['mean_precision'] = mean_precision
+
+    result_dict['pck_50'] = pck_50
+    result_dict['pck_150'] = pck_150
+    result_dict['pck_200'] = pck_200
+    result_dict['pck_300'] = pck_300
     result_dict = {str(k):str(v) for k,v in result_dict.items()}
     return result_dict
 
