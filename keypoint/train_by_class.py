@@ -250,7 +250,7 @@ def get_and_eval_result(params, valid_data):
         pck = np.round(pck, 4), mean_pck = round(np.nanmean(pck), 4), pck_threshold = params_valid['pck_threshold'],
         diff_per_pt=np.round(diff_per_pt, 4), mean_diff_per_pt = round(np.nanmean(diff_per_pt), 4),
         pck_50 = pck_50, pck_150 = pck_150 , pck_200 = pck_200 , pck_300 = pck_300)
-
+    result_dict['result_names'] = str(date.today()) + params['config_name'] +".csv"
 
     return result_dict, pred_coords
 
