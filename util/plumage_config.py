@@ -55,13 +55,16 @@ def generate_grid_params(params):
     return grid_params
 
 def extract_config_name(params):
-    keys = ['epoch', 'scale' , 'is_grey' , 'img_aug',
-        'learning_rate','batch_size', 'l2','dropout_rate', 
-        'output_stride', 'optimizer', 'decay_restart','split_seed']
+    keys = ['category', 'nepochs','network_name', 'scale' , 'is_grey' , 'img_aug',
+        'learning_rate','batch_size', 'optimizer', 'decay_restart','split_seed']
+
+    simple_keys = {'category':'v','nepochs':'epo','network_name':'net', 'scale':'sca' , 'is_grey':'grey' ,
+     'img_aug': 'aug', 'learning_rate':'lr','batch_size':'bat', 'optimizer':'opt', 
+     'decay_restart':'restart','split_seed':'seed'}
     params['config_name'] = ""
     for key in keys:
         if key in params.keys():
-            params['config_name'] += "{}-{};".format(key,params[key]) 
+            params['config_name'] += "{}-{};".format(simple_keys[key],params[key]) 
 
 ###Deprecate
 def save_config(conf_file , save_dir):

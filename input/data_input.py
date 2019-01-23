@@ -157,6 +157,8 @@ class plumage_data_input:
         self.all_columns = df.columns
         self.coords_cols = return_coords_cols(view = view , no_standard = no_standard, train_ids = train_ids)
         self.patches_cols = return_patches_cols(view = view , train_ids = train_ids)
+        self.points_names = [name[:-2] for name in self.coords_cols[0::2]]
+
         self.cols_num_per_coord = 2
         self.lm_cnt = int(len(self.coords_cols) /  self.cols_num_per_coord)
         

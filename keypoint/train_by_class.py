@@ -13,7 +13,7 @@ import network
 from network import _help_func_dict
 import itertools
 from sklearn.model_selection import train_test_split
-
+import datetime
 from datetime import date
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0' 
 
@@ -76,6 +76,7 @@ def create_data(params, df_train, df_valid):
                                heatmap_scale = params['output_stride'],
                                 view = params['category'],no_standard = _help_func_dict(params,"no_standard",False) )
     params['points_num'] = train_data.lm_cnt
+    params['point_names'] = train_data.points_names
     extract_config_name(params)
     return train_data, valid_data
 
@@ -293,7 +294,9 @@ if bool(grid_params):
 
         final_grid_df = final_grid_df.append(pd.DataFrame(result_dict, index=[id_grid]))
 
-    final_grid_df.to_csv(params['valid_result_dir']+ "{}grid_search.csv".format(str(date.today())), index = False)    
+    currentDT = datetime.datetime.now()
+    currentDT_str = currentDT.strftime("%Y-%m-%d_%H:%M:%S")
+    final_grid_df.to_csv(params['valid_result_dir']+ "{}grid_search.csv".format(currentDT_str), index = False)    
 
 
 # training seperating models for different view, or combinations of keypoings
