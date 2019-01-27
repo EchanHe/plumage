@@ -44,7 +44,7 @@ def generate_grid_params(params):
         'learning_rate','learning_rate_decay', 'exponential_decay_epoch',
         'decay_restart', 'first_decay_epoch', 'optimizer',
         'batch_size', 'l2','dropout_rate', 
-        'nlow','nstacks','output_stride','split_seed']
+        'nlow','nstacks','output_stride','split_seed','kfold']
     grid_params = {}
 
     for key in keys:
