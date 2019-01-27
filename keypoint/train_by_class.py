@@ -12,7 +12,7 @@ import sys, os
 import network
 from network import _help_func_dict
 import itertools
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, KFold
 import datetime
 from datetime import date
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0' 
@@ -33,12 +33,33 @@ def read_csv(params):
     ##reading data
     df_all = pd.read_csv(params['input_file'])
     gb = df_all.groupby("view")
-    split_list = [t for x in gb.groups for t in train_test_split(gb.get_group(x),
-     test_size=params['test_size'], random_state =params['split_seed'])]
-    
-    df_train = pd.concat(split_list[0::2],sort = False)
-    df_valid = pd.concat(split_list[1::2],sort = False)
 
+    if params['kfold'] ==None:
+        print("train_test_split with seed:",params['split_seed'] )
+        # train_test_split split option
+        split_list = [t for x in gb.groups for t in train_test_split(gb.get_group(x),
+         test_size=params['test_size'], random_state =params['split_seed'])]
+        
+        df_train = pd.concat(split_list[0::2],sort = False)
+        df_valid = pd.concat(split_list[1::2],sort = False)
+    else:
+        # Kfold option
+        print("Kfold with seed: {} and {} th fold".format(params['split_seed'] ,params['kfold'] ))
+        kf = KFold(n_splits=5 ,shuffle = True, random_state=1)
+        train_list = []
+        valid_list = []
+        for key in gb.groups:
+            data_view = gb.get_group(key)
+            for idx, (train_index, valid_index) in enumerate(kf.split(data_view)):
+        #         print(idx)
+                if idx ==2:
+        #         print("TRAIN:", len(train_index), "TEST:", test_index)
+        #         print(data_view.iloc[train_index,:])
+                    train_list.append(data_view.iloc[train_index,:])         
+                    valid_list.append(data_view.iloc[valid_index,:]) 
+
+        df_train = pd.concat(train_list,sort = False)
+        df_valid = pd.concat(valid_list,sort = False)
 
 
     # ##reading data###
@@ -68,13 +89,15 @@ def create_data(params, df_train, df_valid):
                                pre_path =params['img_folder'],state=params['data_state'],
                                scale=params['scale'] ,is_aug = params['img_aug'],
                                heatmap_scale = params['output_stride'] ,
-                               view = params['category'],no_standard = _help_func_dict(params,"no_standard",False))
+                               view = params['category'],no_standard = _help_func_dict(params,"no_standard",False) ,
+                               coords_cols_override = _help_func_dict(params,"cols_override",None))
     print("Read valid data ....\n")
     valid_data = data_input.plumage_data_input(df_valid,batch_size=params['batch_size'],is_train =params['is_train'],
                                pre_path =params['img_folder'],state=params['data_state'],
                                scale=params['scale'] ,is_aug = False,
                                heatmap_scale = params['output_stride'],
-                                view = params['category'],no_standard = _help_func_dict(params,"no_standard",False) )
+                                view = params['category'],no_standard = _help_func_dict(params,"no_standard",False),
+                                coords_cols_override = _help_func_dict(params,"cols_override",None) )
     params['points_num'] = train_data.lm_cnt
     params['point_names'] = train_data.points_names
     extract_config_name(params)

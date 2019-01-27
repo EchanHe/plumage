@@ -56,15 +56,22 @@ def generate_grid_params(params):
 
 def extract_config_name(params):
     keys = ['category', 'nepochs','network_name', 'scale' , 'is_grey' , 'img_aug',
-        'learning_rate','batch_size', 'optimizer', 'decay_restart','split_seed']
+        'learning_rate','batch_size', 'optimizer', 'decay_restart','split_seed','kfold']
 
     simple_keys = {'category':'v','nepochs':'epo','network_name':'net', 'scale':'sca' , 'is_grey':'grey' ,
      'img_aug': 'aug', 'learning_rate':'lr','batch_size':'bat', 'optimizer':'opt', 
-     'decay_restart':'restart','split_seed':'seed'}
+     'decay_restart':'restart','split_seed':'seed' , 'kfold':'kf'}
+
+    simple_values = {'cpm_vgg':'cpm','hourglass':'HG' , 'False':'F' , 'True':'T'}
+
     params['config_name'] = ""
     for key in keys:
         if key in params.keys():
-            params['config_name'] += "{}-{};".format(simple_keys[key],params[key]) 
+            v = str(params[key])
+            if v in simple_values:
+                params['config_name'] += "{}-{};".format(simple_keys[key],simple_values[v]) 
+            else:
+                params['config_name'] += "{}-{};".format(simple_keys[key],v) 
 
 ###Deprecate
 def save_config(conf_file , save_dir):
