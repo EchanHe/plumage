@@ -45,14 +45,14 @@ def read_csv(params):
     else:
         # Kfold option
         print("Kfold with seed: {} and {} th fold".format(params['split_seed'] ,params['kfold'] ))
-        kf = KFold(n_splits=5 ,shuffle = True, random_state=params['kfold'])
+        kf = KFold(n_splits=5 ,shuffle = True, random_state=params['split_seed'])
         train_list = []
         valid_list = []
         for key in gb.groups:
             data_view = gb.get_group(key)
             for idx, (train_index, valid_index) in enumerate(kf.split(data_view)):
         #         print(idx)
-                if idx ==params['split_seed']:
+                if idx ==params['kfold']:
         #         print("TRAIN:", len(train_index), "TEST:", test_index)
         #         print(data_view.iloc[train_index,:])
                     train_list.append(data_view.iloc[train_index,:])         
