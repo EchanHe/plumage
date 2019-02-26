@@ -28,7 +28,7 @@ no_side_cols = ['crown_x', 'crown_y', 'nape_x',
 
 
      
-def write_pred_dataframe(valid_data , pred_coord , folder,file_name , patches_coord=None, write_index = False ):
+def write_pred_dataframe(valid_data , pred_coord , folder,file_name , patches_coord=None, write_index = False , is_valid = True ):
     """
     Goal: write prediction coordinates to DATAFRAME csv and return the panda dataframe
 
@@ -45,9 +45,10 @@ def write_pred_dataframe(valid_data , pred_coord , folder,file_name , patches_co
     result = pd.DataFrame(pred_coord, columns = valid_data.coords_cols )
     if not os.path.exists(folder):
         os.makedirs(folder)
-
-    gt_coords = valid_data.df[valid_data.coords_cols].values
-    pred_coord[gt_coords==-1] = -1
+  
+    if is_valid:
+        gt_coords = valid_data.df[valid_data.coords_cols].values
+        pred_coord[gt_coords==-1] = -1
     # Write the polygons in if there is given patches_coord
     # Other wise assign all -1.
     if patches_coord is None:

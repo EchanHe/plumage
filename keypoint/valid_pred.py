@@ -25,14 +25,14 @@ from points_metrics import *
 from points_io import write_pred_dataframe
 
 print('--Parsing Config File')
-config_name = 'config_pred.cfg'
+config_name = 'config_pred_hg.cfg'
 
 params = process_config(os.path.join(dirname, config_name))
 
 ##reading data###
 df_pred = pd.read_csv(params['pred_file'])
 
-# df_pred = df_pred.sample(n=30,random_state=3)
+#df_pred = df_pred.sample(n=50,random_state=3)
 # Create the name using some of the configuratation.
 print(params['category'])
 if params['category'] is not None and params['category'] !='all':
@@ -48,7 +48,7 @@ pred_data = data_input.plumage_data_input(df_pred,batch_size=params['batch_size'
                            pre_path =params['img_folder'],state=params['data_state'],
                            scale=params['scale'] ,is_aug = params['img_aug'],
                            heatmap_scale = params['output_stride'])
-
+params['point_names'] = pred_data.points_names
 # Whether validation or prediction
 if 'is_valid' in params:
     is_valid = params['is_valid']
@@ -95,10 +95,12 @@ with tf.Session() as sess:
 
         pred_coords = np.vstack((pred_coords, pred_coord_mini))
     pred_coords = pred_coords[:pred_data.df_size,...]     
+    if start_id % 1000==0:
+        print(start_id, "steps")
     pred_df = write_pred_dataframe(pred_data, pred_coords,
         folder = params['pred_result_dir']+"pred/",
         file_name = str(date.today()) + params['name'],
-        patches_coord=None, write_index = False)
+        patches_coord=None, write_index = False , is_valid = is_valid)
 
 # If validation, print or save the metrics between ground-truth and predictions
 if is_valid:
