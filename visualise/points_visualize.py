@@ -81,14 +81,15 @@ for i in range(0, gt_df.shape[0] , batch_size):
     filename = file_names[i]
     img = cv2.imread(img_path + filename)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) 
-
+    if scale!=1:
+        img = cv2.resize(img, dsize=(img.shape[1]//scale,img.shape[0]//scale), interpolation=cv2.INTER_CUBIC)
 
     pred_coord[gt_coord ==-1]=-1
-    pred_coord[gt_coord ==-1]=pred_coord[gt_coord ==-1]//scale
-    gt_coord[gt_coord ==-1]=gt_coord[gt_coord ==-1]//scale
+    pred_coord[gt_coord !=-1]=pred_coord[gt_coord !=-1]//scale
+    gt_coord[gt_coord !=-1]=gt_coord[gt_coord !=-1]//scale
 
-    gt_patches =  create_rect_on_coords_proportion_length(np.expand_dims(gt_coord,axis=0).astype(float) , width =50,height=50 , ignore_coords =5 , circular_indexing = True)
-    pred_patches =  create_rect_on_coords_proportion_length(np.expand_dims(pred_coord,axis=0).astype(float)  , width =50,height=50 , ignore_coords =5, circular_indexing = True)
+    gt_patches =  create_rect_on_coords_proportion_length(np.expand_dims(gt_coord,axis=0).astype(float) , width =50//scale,height=50//scale , ignore_coords =5 , circular_indexing = True)
+    pred_patches =  create_rect_on_coords_proportion_length(np.expand_dims(pred_coord,axis=0).astype(float)  , width =50//scale,height=50//scale , ignore_coords =5, circular_indexing = True)
 
     if i %100 ==0:
         process = psutil.Process(os.getpid())
@@ -108,10 +109,14 @@ for i in range(0, gt_df.shape[0] , batch_size):
             new_save_path = save_path
 
         if ("intensity_diff" in pred_df.columns) and ("pixel_diff" in pred_df.columns):
-            plt.text(2500,100, "{} intensity_diff: {}".format(pred_df.region.values[i],pred_df.intensity_diff.values[i]),
-                fontdict={'color': "white",'size':12 })
-            plt.text(2500,200, "{} pixel_diff: {}".format(pred_df.region.values[i],pred_df.pixel_diff.values[i]),
-                fontdict={'color': "white",'size':12 })
+
+            plt.text(0.5,0.95, "{} intensity_diff: {}".format(pred_df.region.values[i],pred_df.intensity_diff.values[i]),
+                fontdict={'color': "white",'size':12 },
+                transform=plt.gca().transAxes)
+
+            plt.text(0.5,0.90, "{} pixel_diff: {}".format(pred_df.region.values[i],pred_df.pixel_diff.values[i]),
+                fontdict={'color': "white",'size':12 },
+                transform=plt.gca().transAxes)
         
 
         show_one_markup(plt, img, pred_coord = None, pred_patch = pred_patch, pred_contour = None,

@@ -237,7 +237,8 @@ def show_markups(imgs , pred_coords = None , pred_patches =None , pred_contours=
 
 
 def show_one_markup(plt, img, pred_coord , pred_patch , pred_contour,
-    gt_coord  , gt_patch, gt_contour,pck_threshold, fig_name = "" , LM_CNT =16, save_path = None):
+    gt_coord  , gt_patch, gt_contour,pck_threshold, fig_name = "" , LM_CNT =16, save_path = None,
+    show_patch_labels = False):
     """
     Plot one image and markup using show_coords and show_patches
 
@@ -253,14 +254,29 @@ def show_one_markup(plt, img, pred_coord , pred_patch , pred_contour,
     plt.title(fig_name , fontsize = 20)
     plt.imshow(img)
     # Show the predict mark and pred_patch
-    show_patches(plt, pred_patch)
-    show_patches(plt, pred_contour , is_patch = False)
-    show_coords(plt, pred_coord , LM_CNT = LM_CNT)
+    show_patches(plt, pred_patch,'cyan' , show_patch_labels = show_patch_labels)
+    show_patches(plt, pred_contour,'cyan' )
+    show_coords(plt, pred_coord, pck_threshold,'cyan' , LM_CNT = LM_CNT)
 
     show_patches(plt, gt_patch, 'red')
-    show_patches(plt, gt_contour , 'red', is_patch = False)
+    show_patches(plt, gt_contour , 'red', show_patch_labels = show_patch_labels)
     show_coords(plt, gt_coord, pck_threshold, 'red' , LM_CNT = LM_CNT)
     
+    img_height, img_width = img.shape[0:2]
+
+    plt.plot([0.8,0.85],[0.92]*2, 'cyan' , lw=2 , transform=plt.gca().transAxes)
+    plt.text(0.8 , 0.95,
+        'Prediction', 
+        fontdict={'color': "white",'size':12 },
+        transform=plt.gca().transAxes)
+
+    plt.plot([0.8,0.85],[0.87]*2, 'red', lw=2, transform=plt.gca().transAxes)
+    plt.text(0.8 , 0.90,
+        'Ground Truth', 
+        fontdict={'color': "white",'size':12 },
+        transform=plt.gca().transAxes)
+
+
     if save_path is not None:
         if not os.path.exists(save_path):
             os.makedirs(save_path)
@@ -295,6 +311,7 @@ def show_coords(plt, coord ,pck_threshold = None, color = 'cyan' , LM_CNT = 16):
     if pck_threshold is not None:
         x = coord[0]
         y = coord[1] 
+        print(x,y , pck_threshold)
         plt.plot([x,x], [y,y+pck_threshold],color = 'white' , linewidth = 2.0)
         # plt.text(x* (1.01) , y * (1.01)  , str(pck_threshold)+" pixels", 
         #                      fontsize=10 , bbox=dict(facecolor='white', alpha=0.4))
@@ -304,13 +321,13 @@ def show_coords(plt, coord ,pck_threshold = None, color = 'cyan' , LM_CNT = 16):
         if x >= 0 and ~np.isnan(x):
             plt.plot(x, y, 'x' , alpha=0.8 , mew = 3 , mec = color )
 
-            plt.text(x , y-200 ,
+            plt.text(x , y*0.9 ,
                 patches_names[i_col], 
                 fontdict={'color': color,'size':12 })
     # Write the labels at the text. 
 
 
-def show_patches(plt,patch, color = 'cyan' , is_patch = True ):
+def show_patches(plt,patch, color = 'cyan' , show_patch_labels = False ):
     """
     Plot the patches on figure
 
@@ -329,181 +346,14 @@ def show_patches(plt,patch, color = 'cyan' , is_patch = True ):
                 x = (p_coord[i%length] , p_coord[(i+2)%length])
                 y = (p_coord[(i+1)%length], p_coord[(i+3)%length])
                 plt.plot(x,y,color = color,lw =2)
-            # if is_patch:
-            #     plt.text(p_coord[0] , p_coord[1]-20 ,
-            #         patches_names[id_p][5:], 
-            #         fontdict={'color': color,'size':12 })
+            if show_patch_labels:
+                plt.text(p_coord[0] , p_coord[1]*0.95,
+                    patches_names[id_p], 
+                    fontdict={'color': color,'size':12 })
                 
                 
 
-#### Coords part ######
-
-
-#### Result analysis part ####
-
-def analyse_time(time_series, plt, seg_duration = 100):
-    """
-    Goal: analyse the time
-    
-    params:
-        time_series: the series of with time segs [ts_1, ..., ts_n] as value and configs as index
-        plt: plot
-        seg_duration, the iters for one time segmentions. Default value is 100
-    """
-    fig=plt.figure()
-    ax = fig.add_subplot(211)  
-        #Draw the barplot
-    ax2 = fig.add_subplot(212)  
-    
-    result = pd.DataFrame()
-    
-    for i, v in time_series.items():
-        
-        times = str_to_array(v)
-
-        segs = times.shape[0]
-        total_time = segs * seg_duration
-        segs = np.arange(0, total_time, seg_duration )
-        
-        # Draw the labels of the configs
-        draw_line_plot(ax, segs, times, i)
-        
-        result.loc['time',i] = times[-1]
-        
-        ax2.barh(i, times[-1], align='center')
-        
-    ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-    ax.set_title('Time', fontsize = 'x-large')  # Set the pokemon's name as the title
-    plt.ylabel("Sec")
-    plt.xlabel("Iterations")
-
-    
-    return result
-
-
-def draw_radar(ax,vals,labels , config_name , title):
-    """
-    Goal: draw radar plot
-    
-    params:
-        ax: axis from matplot
-        vals
-    """
-    
-    angles=np.linspace(0, 2*np.pi, len(vals), endpoint=False) # Set the angle
-    angles=np.concatenate((angles,[angles[0]]))
-
-    vals=np.concatenate((vals,[vals[0]])) 
-
-    ax.plot(angles, vals, 'o-' , label=config_name)  # Draw the plot (or the frame on the radar chart)
-    ax.fill(angles, vals, alpha=0.25)  #Fulfill the area  
-    if "diff" not in title:    
-        ax.set_ylim([0,1.0])    
-
-#     angles=np.linspace(np.pi/2, 2*np.pi+np.pi/2, len(labels), endpoint=False) # Set the angle
-    if labels is not None:
-        ax.set_thetagrids(angles * 180/np.pi, labels)  # Set the label for each axis
-        
-def radar_for_df(plt, df , metric, labels, exclude_index =None , include_index = None):
-    """
-    Goal: draw radar plot for all configs of the dataframe
-    
-    params:
-        plt: plt
-        df: data frame of the stat table format
-        metric: metric to draw
-        labels: a list of label for every class of value
-        exclude_index: default is None, and exclude the index of value list.
-    """
-    
-    config_names = df["name"]
-
-    #Plot for list value for every patches or labels.
-    fig = plt.figure()
-    ax = plt.gca(projection = "polar")
-    
-    if exclude_index is not None:
-        labels = np.delete(labels,exclude_index)
-    if include_index is not None:
-        labels = np.take(labels, include_index)
-    for idx,confid_name in enumerate(config_names):
-        value = df.loc[idx ,metric]
-        value = str_to_array(value)
-        
-        if exclude_index is not None:
-            value = np.delete(value,exclude_index)
-        if include_index is not None:
-            value = np.take(value, include_index)
-        draw_radar(ax,value, labels, confid_name, metric)
-    
-    ax.legend(bbox_to_anchor=(1.2, 1), loc=2, borderaxespad=0.) #write the labels box  
-    fig.suptitle(metric , y = 1.0, fontsize = 20)
-
-def draw_barplot(ax, val, x, config_name, horizontal = True):
-    """
-    Goal: draw bar plot
-    
-    params:
-        ax: axis from matplot
-        val: numerical value
-        x: the name of x value
-        config_name: the configuration name
-        horizontal: whether draw the horizontal plot or not
-    """
-    if horizontal:
-        ax.barh(x,val, align='center',label = config_name)
-    else:
-        ax.bar(x,val, align='center',label = config_name)
-    
-
-def barplot_for_df(plt, df, metric, horizontal= True):
-    """
-    Goal: draw bar plot for all configs of the dataframe
-    
-    params:
-        plt: plt
-        df: data frame of the stat table format
-        metric: metric to draw
-        horizontal: whether draw the horizontal plot or not
-    """
-    
-    config_names = df["name"]
-
-    #Plot for list value for every patches or labels.
-    fig = plt.figure()
-    ax = plt.gca()
-    for idx,confid_name in enumerate(config_names):
-        value = float(df.loc[idx ,metric])
-        draw_barplot(ax,value, idx, confid_name, horizontal = horizontal)
-    
-    ax.legend(bbox_to_anchor=(1.2, 1), loc=2, borderaxespad=0.) #write the labels box  
-    fig.suptitle(metric)
-    
-
-##small util##
-
-def str_to_array(s):
-    """
-    Goal: Cast string array to np array
-    
-    params:
-        s, string
-    
-    return np.array
-    """
-    
-    #Check whether string is '[....] format'
-    m = re.match('\[[\S*\s*]*\]', s)
-    assert m is not None, "The string is not in \'[....]\'"
-    #transer string to array
-    if ',' not in s:
-        s = re.sub( '\[\s+', '[', s )
-        s = re.sub( '\s+\]', ']', s )
-        s = re.sub( '\s+', ',', s ).strip()
-    result = np.array(eval(s))
-    return result
-
-
+#### Util part ######
 def _none_or_element(array , id_batch):
     if array is not None:
         return array[id_batch]
