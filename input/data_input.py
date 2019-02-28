@@ -146,12 +146,13 @@ class plumage_data_input:
         self.is_train = is_train
         self.is_aug = is_aug
         #
-        if self.is_aug:
-            # make data frame:
-            df2 = self.df.copy()
-            self.df.loc[:,'aug'] =False
-            df2.loc[:,'aug'] = True
-            self.df = pd.concat([self.df, df2]).reset_index(drop=True)
+        # if self.is_aug:
+        #     # make data frame:
+        #     df2 = self.df.copy()
+        #     self.df.loc[:,'aug'] =False
+        #     df2.loc[:,'aug'] = True
+        #     self.df = pd.concat([self.df, df2]).reset_index(drop=True)
+
         self.df_size = self.df.shape[0]
         
         self.all_columns = df.columns
@@ -656,7 +657,143 @@ class plumage_data_input:
                     y_map[j,:,:,i] = np.zeros((scaled_height,scaled_width))
         return y_map
 
+    def create_aug_imgs(self, df , output_folder,seed = 1):
+        """
+        Goal: 
+            1. create a dataframe that had the coords updated
+            2. save updated photo in a folder.
+        
+        """        
+        df = df.copy()
+        df['aug'] = True
+        folder = self.pre_path
+        new_folder = folder + output_folder
+        
+        l_m_columns = self.coords_cols
 
+        width = self.img_width
+        height = self.img_height
+        rand_lib.seed(seed)
+        # Iterate for each row:
+        for idx,row in df.iterrows(): 
+            if row['aug']==True:
+                filename = folder+row[self.file_name_col]
+                
+                row[self.file_name_col] =output_folder +row[self.file_name_col]
+                img = cv2.imread(filename)
+                # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                img_hei = img.shape[0]
+                img_wid = img.shape[1]
+                #-----Translate----
+                if self.aug_option['trans']:
+#                 if False:
+                    min_offset = 100
+                    max_offset = 500
+                    trans_lr = choice([randint(min_offset,max_offset) , randint(-max_offset,-min_offset)] ) #left/right (i.e. 5/-5)
+
+                    trans_ud = choice([randint(min_offset,max_offset) , randint(-max_offset,-min_offset)] ) #up/down (i.e. 5/-5)
+
+
+                    old_row = row.copy()
+                    for i in np.arange(0,len(l_m_columns),self.cols_num_per_coord):
+                        id_x = l_m_columns[i]
+                        id_y = l_m_columns[i+1]
+                        id_vis = l_m_columns[i]
+                        if row[id_vis] !=-1:
+                            row[id_x] = row[id_x] + trans_lr
+                            row[id_y] = row[id_y] + trans_ud
+                            not_inside = row[id_x]>self.img_width or row[id_x]<0 or row[id_y]>self.img_height or row[id_y]<0 
+                            if not_inside:
+#                                 print(idx, "outside")
+                                trans_lr=0
+                                trans_ud = 0
+                                row= old_row
+                                break
+                    M = np.float32([[1,0,trans_lr],[0,1,trans_ud]])
+
+                    img = cv2.warpAffine(img,M,(img_wid,img_hei))
+
+
+                if self.aug_option['scale']:
+
+                    scale_ratio = randint(90,110)/100
+                    is_scale = True
+                    new_scaled_width = (int(self.img_width/scale_ratio))
+                    new_scaled_height = (int(self.img_height/scale_ratio))
+
+                    delta_w = self.img_width - new_scaled_width
+                    delta_h = self.img_height - new_scaled_height
+
+                    old_row = row.copy()
+                    for i in np.arange(0,len(l_m_columns),self.cols_num_per_coord):
+                        id_x = l_m_columns[i]
+                        id_y = l_m_columns[i+1]
+                        id_vis = l_m_columns[i]
+                        if row[id_vis] !=-1:
+                            if scale_ratio >1.0:
+                                row[id_x] = (row[id_x] )//scale_ratio+ delta_w//2
+                                row[id_y] = (row[id_y])//scale_ratio + delta_h//2
+                            else:
+                                row[id_x] = (row[id_x] )//scale_ratio
+                                row[id_y] = (row[id_y])//scale_ratio
+
+                            not_inside = row[id_x]>self.img_width or row[id_x]<0 or row[id_y]>self.img_height or row[id_y]<0 
+                        if not_inside:
+#                                 print(idx, "outside")
+                            is_scale = False
+                            row= old_row
+                            break    
+                    if is_scale:
+                        img = cv2.resize(img, dsize=(new_scaled_width,new_scaled_height),
+                                         interpolation=cv2.INTER_CUBIC)                    
+                        if scale_ratio >1.0:
+                            img= cv2.copyMakeBorder(img,delta_h//2,delta_h-(delta_h//2),
+                                                    delta_w//2,delta_w-(delta_w//2),
+                                                    cv2.BORDER_CONSTANT,value=[0,0,0])
+                        else:
+                            img= img[-delta_h:self.img_height-delta_h , -delta_w:self.img_width-delta_w ]
+            # ---------Rotate--------
+                if self.aug_option['rot']: 
+                    angle_upper = 8
+                    angle_lower = 1
+                    angle = choice([randint(-angle_upper,-angle_lower) , randint(angle_lower,angle_upper)])
+#                     angle =15
+                    radian = math.pi/180*angle
+
+                    old_row = row.copy()
+
+                    for i in np.arange(0,len(l_m_columns),self.cols_num_per_coord):
+                        id_x = l_m_columns[i]
+                        id_y = l_m_columns[i+1]
+                        id_vis = l_m_columns[i]
+                        if row[id_vis] !=-1:
+                            x = row[id_x] - self.img_width/2
+                            y = (self.img_height- row[id_y])
+                            y=y- self.img_height/2 
+                            row[id_x] = x*math.cos(radian) - ((y)*math.sin(radian))
+                            row[id_x] =int((row[id_x] + self.img_width/2))
+                            row[id_y] =(x*math.sin(radian) + ((y)*math.cos(radian)))
+                            row[id_y] =int ((self.img_height-(row[id_y]+self.img_height/2 )))
+                            not_inside = row[id_x]>self.img_width or row[id_x]<0 or row[id_y]>self.img_height or row[id_y]<0 
+                            if not_inside:
+#                                 print(idx, "outside")
+                                angle=0
+                                row= old_row
+                                break
+                    M = cv2.getRotationMatrix2D((img_wid/2,img_hei/2),angle,1)
+                    img = cv2.warpAffine(img,M,(img_wid,img_hei))
+
+                gamma = randint(7,20)/10
+                invGamma = 1.0 / gamma
+                table = np.array([((i / 255.0) ** invGamma) * 255
+                  for i in np.arange(0, 256)]).astype("uint8")
+
+                img =  cv2.LUT(img, table)
+                # img = cv2.convertScaleAbs(img, alpha=1.0, beta=0.0)
+#                 print(trans_lr, trans_ud, scale_ratio, angle)
+                df.loc[idx,:] = row   
+                cv2.imwrite(folder + row[self.file_name_col],img ,[int(cv2.IMWRITE_JPEG_QUALITY),60])     
+        return df
 
     def get_x_df_aug(self ,df):
         folder = self.pre_path

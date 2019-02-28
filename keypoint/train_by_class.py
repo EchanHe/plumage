@@ -61,15 +61,20 @@ def read_csv(params):
         df_train = pd.concat(train_list,sort = False)
         df_valid = pd.concat(valid_list,sort = False)
 
-
-    # ##reading data###
-    # df_train = pd.read_csv(params['train_file'])
-    # df_valid = pd.read_csv(params['valid_file'])
-
     #Sampling a sub set
     if 'small_data' in params and params['small_data']:
-        df_train = df_train.sample(n=100,random_state=3)
+        df_train = df_train.sample(n=5,random_state=3)
         df_valid = df_valid.sample(n=20,random_state=3)
+
+
+    if 'aug_folders' in params and params['aug_folders'] is not None:
+        df_list = [df_train]
+        for aug_folder in params['aug_folders']:
+            df_new = df_train.copy()
+            df_new['file.vis'] = aug_folder + df_new['file.vis']
+            df_list.append(df_new)
+        df_train = pd.concat(df_list).reset_index(drop = True )
+        print(df_train['file.vis'])
 
     # Create the name using some of the configuratation.
     print(params['category'])
@@ -87,7 +92,7 @@ def create_data(params, df_train, df_valid):
     print("Read training data ....")
     train_data = data_input.plumage_data_input(df_train,batch_size=params['batch_size'],is_train =params['is_train'],
                                pre_path =params['img_folder'],state=params['data_state'],
-                               scale=params['scale'] ,is_aug = params['img_aug'],
+                               scale=params['scale'] ,is_aug = False,
                                heatmap_scale = params['output_stride'] ,
                                view = params['category'],no_standard = _help_func_dict(params,"no_standard",False) ,
                                coords_cols_override = _help_func_dict(params,"cols_override",None))
