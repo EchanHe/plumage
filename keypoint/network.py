@@ -133,11 +133,11 @@ class Pose_Estimation:
 
         ##### Select the optimizer
         if self.optimizer == 'adam':
-            # print("adam")
             optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
         elif self.optimizer == 'sgd':
-            # print("sssssssssssssgd")
             optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate)
+        elif self.optimizer == 'rmsprop':
+            optimizer = tf.train.RMSPropOptimizer(learning_rate=self.learning_rate)
 
         # grads = optimizer.compute_gradients(total_loss)
         # apply_gradient_op = optimizer.apply_gradients(grads, global_step=global_step)  
