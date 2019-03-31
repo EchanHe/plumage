@@ -218,6 +218,7 @@ def show_markups(imgs , pred_coords = None , pred_patches =None , pred_contours=
 
     for i_start in range(0,result_size,batch):
         fig  = plt.figure(figsize=(ncols * 10, nrows *10))
+
         for i_row in range(i_start, i_start+batch):
             plt.subplot(nrows, ncols,(i_row)%(ncols*nrows)+1)
 
@@ -231,14 +232,16 @@ def show_markups(imgs , pred_coords = None , pred_patches =None , pred_contours=
         if save_path is not None:
             if not os.path.exists(save_path):
                 os.makedirs(save_path)
-            fig.savefig(save_path+image_name+"_{}.jpg".format(i_start))
+            plt.axis('off')
+            plt.savefig(save_path+image_name+"_{}.jpg".format(i_start) ,bbox_inches='tight')
         plt.close("all")
         fig.clf()
 
 
 def show_one_markup(plt, img, pred_coord , pred_patch , pred_contour,
-    gt_coord  , gt_patch, gt_contour,pck_threshold, fig_name = "" , LM_CNT =16, save_path = None,
-    show_patch_labels = False):
+    gt_coord  , gt_patch, gt_contour,pck_threshold, fig_name = "" , LM_CNT =15, save_path = None,
+    linewidth = 3,
+    show_patch_labels = False , show_colour_labels = False , show_fig_title = True , format = 'png'):
     """
     Plot one image and markup using show_coords and show_patches
 
@@ -250,37 +253,39 @@ def show_one_markup(plt, img, pred_coord , pred_patch , pred_contour,
         gt / pred_contour: a list of contours coords [contours count][contour points *2 ].
         fig_name: The img name that used to name current figure
     """
-
-    plt.title(fig_name , fontsize = 20)
+    if show_fig_title:
+        plt.title(fig_name , fontsize = 20)
     plt.imshow(img)
     # Show the predict mark and pred_patch
-    show_patches(plt, pred_patch,'cyan' , show_patch_labels = show_patch_labels)
-    show_patches(plt, pred_contour,'cyan' )
-    show_coords(plt, pred_coord, pck_threshold,'cyan' , LM_CNT = LM_CNT)
+    show_patches(plt, pred_patch,'deepskyblue' , show_patch_labels = show_patch_labels,linewidth=linewidth)
+    show_patches(plt, pred_contour,'deepskyblue' ,linewidth=linewidth )
+    show_coords(plt, pred_coord, pck_threshold,'deepskyblue' , LM_CNT = LM_CNT , show_patch_labels= show_patch_labels)
 
-    show_patches(plt, gt_patch, 'red')
-    show_patches(plt, gt_contour , 'red', show_patch_labels = show_patch_labels)
+    show_patches(plt, gt_patch, 'red',linewidth=linewidth)
+    show_patches(plt, gt_contour , 'red', show_patch_labels = show_patch_labels,linewidth=linewidth)
     show_coords(plt, gt_coord, pck_threshold, 'red' , LM_CNT = LM_CNT)
     
     img_height, img_width = img.shape[0:2]
 
-    plt.plot([0.8,0.85],[0.92]*2, 'cyan' , lw=2 , transform=plt.gca().transAxes)
-    plt.text(0.8 , 0.95,
-        'Prediction', 
-        fontdict={'color': "white",'size':12 },
-        transform=plt.gca().transAxes)
+    if show_colour_labels:
+        plt.plot([0.8,0.85],[0.92]*2, 'deepskyblue' , lw=2 , transform=plt.gca().transAxes)
+        plt.text(0.8 , 0.95,
+            'Prediction', 
+            fontdict={'color': "white",'size':12 },
+            transform=plt.gca().transAxes)
 
-    plt.plot([0.8,0.85],[0.87]*2, 'red', lw=2, transform=plt.gca().transAxes)
-    plt.text(0.8 , 0.90,
-        'Ground Truth', 
-        fontdict={'color': "white",'size':12 },
-        transform=plt.gca().transAxes)
+        plt.plot([0.8,0.85],[0.87]*2, 'red', lw=2, transform=plt.gca().transAxes)
+        plt.text(0.8 , 0.90,
+            'Ground Truth', 
+            fontdict={'color': "white",'size':12 },
+            transform=plt.gca().transAxes)
 
 
     if save_path is not None:
         if not os.path.exists(save_path):
             os.makedirs(save_path)
-        plt.savefig(save_path + fig_name)
+        plt.axis('off')
+        plt.savefig(save_path + fig_name+'.'+format ,bbox_inches='tight',format = format)
         plt.close("all")
         plt.clf()
 
@@ -293,7 +298,9 @@ patches_names = ['s1','s2','s3','s4','s5', 'crown', 'nape','mantle', 'rump', 'ta
 'throat', 'breast', 'belly', 
   'wing\ncoverts',   'wing\nprimaries\nsecondaries',]
 
-def show_coords(plt, coord ,pck_threshold = None, color = 'cyan' , LM_CNT = 16):
+# patches_names = np.arange(1,16).astype(str)
+
+def show_coords(plt, coord ,pck_threshold = None, color = 'deepskyblue' , LM_CNT = 16,show_patch_labels = False):
     """
     Plot the 2D points on figure
 
@@ -311,7 +318,6 @@ def show_coords(plt, coord ,pck_threshold = None, color = 'cyan' , LM_CNT = 16):
     if pck_threshold is not None:
         x = coord[0]
         y = coord[1] 
-        print(x,y , pck_threshold)
         plt.plot([x,x], [y,y+pck_threshold],color = 'white' , linewidth = 2.0)
         # plt.text(x* (1.01) , y * (1.01)  , str(pck_threshold)+" pixels", 
         #                      fontsize=10 , bbox=dict(facecolor='white', alpha=0.4))
@@ -319,15 +325,19 @@ def show_coords(plt, coord ,pck_threshold = None, color = 'cyan' , LM_CNT = 16):
         x = coord[ i_col * cols_num_per_coord]
         y = coord[ i_col * cols_num_per_coord +1] 
         if x >= 0 and ~np.isnan(x):
-            plt.plot(x, y, 'x' , alpha=0.8 , mew = 3 , mec = color )
-
-            plt.text(x , y*0.9 ,
-                patches_names[i_col], 
-                fontdict={'color': color,'size':12 })
+            # plt.plot(x, y, 'o' , alpha=0.8 , mew = 4 , mec = color )
+            plt.scatter(x, y ,s=80, c = color , alpha =0.7 )
+            if show_patch_labels:
+                axis_width = np.max(plt.gca().get_xlim())
+                axis_height = np.max(plt.gca().get_ylim())
+                plt.text(x/axis_width , 1-(y/axis_height-0.02) ,
+                    patches_names[i_col], 
+                    fontdict={'color': color,'size':12 },
+                    transform=plt.gca().transAxes)
     # Write the labels at the text. 
 
 
-def show_patches(plt,patch, color = 'cyan' , show_patch_labels = False ):
+def show_patches(plt,patch, color = 'deepskyblue' , show_patch_labels = False, linewidth=3 ):
     """
     Plot the patches on figure
 
@@ -340,12 +350,15 @@ def show_patches(plt,patch, color = 'cyan' , show_patch_labels = False ):
 
     for id_p, p_coord in enumerate(patch):
         # print(p_coord)
-        length = p_coord.shape[0]
+        if isinstance(p_coord, (list)):
+            length = len(p_coord)
+        else:
+            length = p_coord.shape[0]
         if length>=2:
             for i in range(0,length,2):
                 x = (p_coord[i%length] , p_coord[(i+2)%length])
                 y = (p_coord[(i+1)%length], p_coord[(i+3)%length])
-                plt.plot(x,y,color = color,lw =2)
+                plt.plot(x,y,color = color,lw =linewidth , alpha =0.8)
             if show_patch_labels:
                 plt.text(p_coord[0] , p_coord[1]*0.95,
                     patches_names[id_p], 

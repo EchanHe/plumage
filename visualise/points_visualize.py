@@ -20,6 +20,12 @@ from visualize_lib import *
 from points_util import pred_coords_to_patches,create_rect_on_coords_proportion_length
 from points_metrics import pck_accuracy
 
+def _help_func_dict(config,key, default_value = None):
+    if key in config:
+        return config[key]
+    else:
+        return default_value
+
 def turn_str_to_patch_coord(patches):
     patches_coords = [0]* patches.shape[0]
     for row in np.arange(patches.shape[0]):
@@ -43,37 +49,33 @@ params = process_config(os.path.join(dirname, config_name))
 
 
 ## Visualize training images
-
-#for each view
 gt_file = params["gt_file"]
 pred_file = params["pred_file"]
-# view = "side"
 
 img_path = params["img_folder"]
 save_path = params["save_path"]
 
 scale = params['scale']
 batch_size =  params['batch_size']
+file_col = params['file_col']
+
+plot_patches = params['plot_patches']
+coords_cols = params['cols_override']
+output_format = params['output_format']
 
 gt_df = pd.read_csv(gt_file)
 pred_df = pd.read_csv(pred_file)
-gt_df = pd.merge(pred_df[['file.vis']],gt_df, on=['file.vis'])
-gt_df = gt_df.sort_values(by=['file.vis'])
-pred_df = pred_df.sort_values(by=['file.vis'])
-# gt_df = gt_df.loc[gt_df.view == view].reset_index()
+# pred_df = pred_df[:1]
 
-gt_data = data_input.plumage_data_input(gt_df, batch_size ,scale = scale, state = 'coords',
-                                         is_train=True ,
-                                           pre_path = img_path,is_aug=False )
-
-pred_data  = data_input.plumage_data_input(pred_df, batch_size ,scale = scale, state = 'coords',
-                                         is_train=True ,
-                                           pre_path = img_path,is_aug=False )
+# 
+gt_df = pd.merge(pred_df[[file_col]],gt_df, on=[file_col])
+gt_df = gt_df.sort_values(by=[file_col])
+pred_df = pred_df.sort_values(by=[file_col])
 
 
-gt_coords = gt_df[gt_data.coords_cols].values
-pred_coords = pred_df[pred_data.coords_cols].values
-file_names = gt_df["file.vis"].values
+gt_coords = gt_df[coords_cols].values
+pred_coords = pred_df[coords_cols].values
+file_names = gt_df[file_col].values
 for i in range(0, gt_df.shape[0] , batch_size):
 
     pred_coord = pred_coords[i]
@@ -88,8 +90,10 @@ for i in range(0, gt_df.shape[0] , batch_size):
     pred_coord[gt_coord !=-1]=pred_coord[gt_coord !=-1]//scale
     gt_coord[gt_coord !=-1]=gt_coord[gt_coord !=-1]//scale
 
-    gt_patches =  create_rect_on_coords_proportion_length(np.expand_dims(gt_coord,axis=0).astype(float) , width =50//scale,height=50//scale , ignore_coords =5 , circular_indexing = True)
-    pred_patches =  create_rect_on_coords_proportion_length(np.expand_dims(pred_coord,axis=0).astype(float)  , width =50//scale,height=50//scale , ignore_coords =5, circular_indexing = True)
+    gt_patches =  create_rect_on_coords_proportion_length(np.expand_dims(gt_coord,axis=0).astype(float),
+     width =50//scale,height=50//scale , ignore_coords =5 , circular_indexing = True)
+    pred_patches =  create_rect_on_coords_proportion_length(np.expand_dims(pred_coord,axis=0).astype(float),
+     width =50//scale,height=50//scale , ignore_coords =5, circular_indexing = True)
 
     if i %100 ==0:
         process = psutil.Process(os.getpid())
@@ -98,7 +102,7 @@ for i in range(0, gt_df.shape[0] , batch_size):
 
     fig  = plt.figure(figsize=(15, 8))
     
-
+    # plot the result
     if params['plot_result']:
         pred_patch =turn_str_to_patch_coord(np.array(pred_patches[0]))
         gt_patch =turn_str_to_patch_coord(np.array(gt_patches[0]))
@@ -118,10 +122,20 @@ for i in range(0, gt_df.shape[0] , batch_size):
                 fontdict={'color': "white",'size':12 },
                 transform=plt.gca().transAxes)
         
-
-        show_one_markup(plt, img, pred_coord = None, pred_patch = pred_patch, pred_contour = None,
-        gt_coord =None, gt_patch = gt_patch, gt_contour = None, pck_threshold =100, 
-         fig_name = filename , LM_CNT =15, save_path =new_save_path , show_patch_labels = True)
+        pred_patch = pred_patch[5:]
+        gt_patch = gt_patch[5:]
+        if plot_patches:
+            show_one_markup(plt, img, pred_coord = pred_coord[:10,...], pred_patch = pred_patch, pred_contour = None,
+            gt_coord =gt_coord[:10:,...], gt_patch = gt_patch, gt_contour = None, pck_threshold =None, 
+             fig_name = filename , LM_CNT =5, save_path =new_save_path ,
+              show_patch_labels = False , show_colour_labels = False , show_fig_title = False,
+              format = output_format)
+        else:
+            show_one_markup(plt, img, pred_coord = pred_coord, pred_patch = None, pred_contour = None,
+            gt_coord =gt_coord, gt_patch = None, gt_contour = None, pck_threshold =None, 
+             fig_name = filename , LM_CNT =len(coords_cols)//2, save_path =new_save_path ,
+              show_patch_labels = True , show_colour_labels = False , show_fig_title = False,
+              format = output_format)
     else:    
         diff_coord,_ = pck_accuracy(np.expand_dims(pred_coord,axis=0) , np.expand_dims(gt_coord,axis=0) ,15,100)
         for idx, coord in enumerate(diff_coord):
