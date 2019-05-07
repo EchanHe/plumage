@@ -17,7 +17,34 @@ import math
 from PIL import ImageEnhance,ImageChops,ImageOps,ImageFilter
 import sys
 
-from config_data import return_patches_cols , return_coords_cols
+from config_data import return_coords_cols
+
+import re
+
+def str_to_array(s):
+    """
+    Goal: Cast string array to np array
+    
+    params:
+        s, string
+    
+    return np.array
+    """
+    
+    #Check whether string is '[....] format'
+    m = re.match('\[[\S*\s*]*\]', s)
+    assert m is not None, "The string is not in \'[....]\'"
+    #transer string to array
+    if ',' not in s:
+        s = re.sub( '\[\s+', '[', s )
+        s = re.sub( '\s+\]', ']', s )
+        s = re.sub( '\s+', ',', s ).strip()
+    result = eval(s)
+    if type(result) == tuple:
+        result = list(result)
+    else:
+        result = [result]
+    return result
 
 
 def check_masks(masks):
@@ -99,32 +126,19 @@ class plumage_data_input:
     """
     
     #---- basic config ----
-    file_name_col = 'file.vis'
-    file_info_cols = ['file.vis', 'file.uv', 'view' , 'img.missing']
-    contour_col = ["poly.outline" ]
-    # patches_cols = ['poly.crown' , 'poly.nape','poly.mantle', 'poly.rump', 'poly.tail',
-    # 'poly.throat', 'poly.breast', 'poly.belly', 'poly.tail.underside',
-    #  'poly.wing.coverts',   'poly.wing.primaries.secondaries']
-
-    # coords_cols = ['s02.standard_x', 's02.standard_y', 's20.standard_x', 's20.standard_y',
-    #    's40.standard_x', 's40.standard_y', 's80.standard_x', 's80.standard_y',
-    #    's99.standard_x', 's99.standard_y','crown_x', 'crown_y', 'nape_x',
-    #    'nape_y', 'mantle_x', 'mantle_y', 'rump_x', 'rump_y', 'tail_x',
-    #    'tail_y', 'throat_x', 'throat_y', 'breast_x', 'breast_y', 'belly_x',
-    #    'belly_y', 'tail.underside_x', 'tail.underside_y', 'wing.coverts_x',
-    #    'wing.coverts_y', 'wing.primaries.secondaries_x',
-    #    'wing.primaries.secondaries_y']
     # contour_col = ["poly.outline" ]
-    # cols_num_per_coord = 2
-    # lm_cnt = int(len(coords_cols) /  cols_num_per_coord)
-    
+
+    contour_col = "outline"
+    obs_col = "obstruction"
+
+
     aug_option = {'trans' :True , 'rot' :True , 'scale' :True}
     STATE_OPTIONS = ['coords', 'contour', 'patches']
     
     #---basic config ---
-    def __init__(self,df,batch_size,is_train,pre_path, state,
-        scale=1 ,is_aug = True , heatmap_scale = 4,
-         view = 'all', no_standard = False , train_ids = None, coords_cols_override = None):
+    def __init__(self,df,batch_size,is_train,pre_path, state,file_col,
+        scale=1 ,is_aug = False , heatmap_scale = 4,cols_num_per_coord =2,
+         view = 'all', no_standard = False , train_ids = None, coords_cols_override = None , default_coords_cols = False):
         """
         init function for the data
         
@@ -145,6 +159,7 @@ class plumage_data_input:
         self.batch_size = batch_size
         self.is_train = is_train
         self.is_aug = is_aug
+        self.file_name_col = file_col
         #
         # if self.is_aug:
         #     # make data frame:
@@ -156,25 +171,31 @@ class plumage_data_input:
         self.df_size = self.df.shape[0]
         
         self.all_columns = df.columns
+
         if coords_cols_override is not None:
             self.coords_cols = coords_cols_override
+        elif default_coords_cols:
+            self.coords_cols = np.setdiff1d(df.columns, self.file_name_col)
         else:
             self.coords_cols = return_coords_cols(view = view , no_standard = no_standard, train_ids = train_ids)
-        self.patches_cols = return_patches_cols(view = view , train_ids = train_ids)
-        self.points_names = [name[:-2] for name in self.coords_cols[0::2]]
-
-
-
-        self.cols_num_per_coord = 2
-        self.lm_cnt = int(len(self.coords_cols) /  self.cols_num_per_coord)
         
+        self.cols_num_per_coord = cols_num_per_coord
+        self.lm_cnt = int(len(self.coords_cols) /  self.cols_num_per_coord)
+        self.points_names = [name[:-2] for name in self.coords_cols[0::self.cols_num_per_coord]]
+        ## TODO: fixe patches
+        # self.patches_cols = return_patches_cols(view = view , train_ids = train_ids)
+        
+
+        #Set the Indices for training
         self.start_idx =0
         self.indices = np.arange(self.df_size)
         np.random.shuffle(self.indices)
+
+
+        # Print Data detail
         filepath_test = pre_path+df.loc[df.index[0],self.file_name_col]
         print(filepath_test)
         img = cv2.imread(filepath_test)
-#         img = Image.open(filepath_test)
         self.img_width= img.shape[1]
         self.img_height = img.shape[0]
 
@@ -190,17 +211,20 @@ class plumage_data_input:
 
         print("Data output type: {}".format(self.state))
         if self.state =='coords':
-            print("\tOutput stride: {}\n\tThe output heatmap shape: {}*{}*{}".format(self.heatmap_scale,
-             self.img_width//(self.scale*self.heatmap_scale),  self.img_height//(self.scale*self.heatmap_scale), self.lm_cnt ))
+            print("\tThe output heatmap shape: {}*{}*{}".format(self.img_width//(self.scale*self.heatmap_scale),
+              self.img_height//(self.scale*self.heatmap_scale), self.lm_cnt ))
             
             self.output_channel = int(len(self.coords_cols) /  self.cols_num_per_coord)
         elif self.state =='patches':
             self.output_channel = len(self.patches_cols) + 1
+
         elif self.state =='contour':
-            self.output_channel = len(self.contour_col) + 1
+            self.output_channel = 2
+            print("\tThe outline mask shape: {}*{}*{}".format(self.img_width//(self.scale),
+              self.img_height//(self.scale), self.output_channel ))
         
         
-        
+    ## Get the data format for training. ##    
     
     def get_next_batch(self):
         """
@@ -344,7 +368,9 @@ class plumage_data_input:
         else:
             return x_mini
    
-    ## Get all labels from the data.
+    ##  Get the data information ##
+
+    ## Get all images and labels from the data.
     def get_next_batch_no_random_all_labels(self):
         batch_size = self.batch_size
         df_size = self.df_size
@@ -372,7 +398,7 @@ class plumage_data_input:
         self.start_idx += batch_size
         return x_mini, coords_mini , p_coords_mini, c_coords_mini
    
-        ## Get all labels from the data.
+    ## Get all images from the images only
     def get_next_batch_no_random_img_only(self):
         batch_size = self.batch_size
         df_size = self.df_size
@@ -388,6 +414,7 @@ class plumage_data_input:
         self.start_idx += batch_size
         return x_mini
 
+    ## Get all labels from the data.
     def get_next_batch_no_random_all_labels_without_img(self):
         batch_size = self.batch_size
         df_size = self.df_size
@@ -487,7 +514,7 @@ class plumage_data_input:
         return output_map
 
     
-    def get_y_contour(self, df):
+    def get_y_contour_old_data_format(self, df):
         #Get the contour
         scale = self.scale
         cols = self.contour_col
@@ -513,6 +540,64 @@ class plumage_data_input:
                     cv2.fillPoly(mask, coords, 1)
                     output_map[row, :,:,col+1] = mask
             label_row = np.argmax(output_map[row, ...],axis=2)
+            output_map[row,label_row==0,0] =1  
+        return output_map
+
+    def get_y_contour(self, df):
+        """
+        Get the outline mask from label data
+            fillpoly with outline polygons
+            
+            if there is obstrcution polygons, fill them.
+        
+        return : mask of (batch, height, width ,2)
+        
+        0 for background, 1 for outline
+        """
+        # 
+
+        scale = self.scale
+        contour_col = self.contour_col
+        obs_col = self.obs_col
+
+        width = int(self.img_width/scale)
+        height = int(self.img_height/scale)
+        output_map = np.zeros((df.shape[0] , height,width ,  self.output_channel))
+
+        outlines_coords = df[contour_col].values
+        obstructions_coords = df[obs_col].values
+        
+        for row in np.arange(df.shape[0]):
+            outline_coords = outlines_coords[row]
+            obstruction_coords = obstructions_coords[row]
+
+            # Outline part
+            outline_coords = str_to_array(outline_coords)
+            mask = np.zeros((height, width))
+            for outline_coord in outline_coords:
+                mask_temp = np.zeros((height, width))
+                outline_coord = [[x//scale,y//scale] for (x,y) in zip(outline_coord[::2], outline_coord[1::2])]
+                outline_coord = np.expand_dims(outline_coord , axis = 0)
+                cv2.fillPoly(mask_temp, outline_coord, 1)
+                mask = np.logical_or(mask , mask_temp)
+            
+            output_map[row,mask,1] = 1
+            
+            #Obstruction part
+            # check if there is obstructions 
+            if type(obstruction_coords) is str:
+                obstruction_coords = str_to_array(obstruction_coords)
+                mask = np.zeros((height, width))
+                for obstruction_coord in obstruction_coords:
+                    mask_temp = np.zeros((height, width))
+                    obstruction_coord = [[x//scale,y//scale] for (x,y) in zip(obstruction_coord[::2], obstruction_coord[1::2])]
+                    obstruction_coord = np.expand_dims(obstruction_coord , axis = 0)
+                    cv2.fillPoly(mask_temp, obstruction_coord, 1)
+                    mask = np.logical_or(mask , mask_temp)
+                output_map[row,mask,1] = 0
+            ##
+            
+            label_row = np.argmax(output_map[row,...],axis=2)
             output_map[row,label_row==0,0] =1  
         return output_map
     def get_contour_patches_coords(self, df ,mode):

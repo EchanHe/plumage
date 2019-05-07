@@ -5,9 +5,31 @@ The transformation and data processing of segs and masks
 """
 
 import numpy as np
-from skimage import morphology
+from skimage import morphology,measure
 import cv2
 
+def masks_to_contours(masks , scale , ignore_mask_channel = [0]):
+    masks_list = []
+    for mask in masks:
+        masks_list+= [mask_to_contour(mask , scale , ignore_mask_channel)]
+
+    return np.array(masks_list)
+def mask_to_contour(mask , scale , ignore_mask_channel):
+    channel_list = []
+    for channel in range(0,mask.shape[-1]):
+        if channel not in ignore_mask_channel:
+            contours = measure.find_contours(mask[...,channel],0.5)
+            contours_list = []
+            if len(contours)==0:
+                print(0)
+                print(np.sum(mask[...,channel]))
+            for contour in contours:
+                contour = (np.flip(contour,axis = 1)*scale).astype(int)
+                contour = contour.ravel().tolist()
+                contours_list+=[contour]
+            contours_list = str(contours_list)[1:-1]
+            channel_list += [contours_list]    
+    return channel_list
 def resize_segs(segs ,  width, height):
     """
     Resize the segmentations to given width and height
@@ -56,7 +78,6 @@ def segs_to_masks(segs):
     n_cl = np.max(segs) + 1
 
     masks = np.zeros((segs.shape[0] , segs.shape[1] , segs.shape[2] , n_cl))
-    print(masks.shape)
     for i in np.arange(df_size):
         cl, _ = extract_classes(segs[i,...] )
         # print(np.sum(extract_masks(segs[i,...] , cl, n_cl)))

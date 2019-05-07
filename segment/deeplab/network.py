@@ -2,30 +2,54 @@ import tensorflow as tf
 import tensorflow.contrib.layers as layers
 slim = tf.contrib.slim
 from resnet import resnet_v2, resnet_utils
+import numpy as np
 class Network:
-    def __init__(self , config):
+    def __init__(self , config ,ori_img_width, ori_img_height , is_train = None):
         """
-        初始化模型的配置  
+        Read in params to generate the neural network.
         """
+        if is_train is not None:
+            self.is_train = is_train
+        else:
+            self.is_train = config['is_train']
                 
+        self.is_grey = config['is_grey']
+        self.network_name = config['network_name']
+
+        self.cpu = '/cpu:0'     
         self.global_step = tf.get_variable("global_step", initializer=0,
                     dtype=tf.int32, trainable=False)
-        self.start_learning_rate =config['learning_rate']
-        self.lambda_l2 = config['lambda_l2']
-        # self.stddev = config.stddev
         self.batch_size = config['batch_size']
+
+
+
+        self.dropout_rate = config['dropout_rate']
+        self.lambda_l2 = config["l2"]
+        # self.stddev = config.stddev
+        
         # self.use_fp16 = config.use_fp16
-        self.class_num = config['class_num']
+        self.class_num = 2
         self.params_dir = config['saver_directory']
 
 
-        self.img_height = config['img_height']//config['scale']
-        self.img_width = config['img_width']//config['scale']
+        self.scale = config['scale']
+        self.img_height = ori_img_height // self.scale
+        self.img_width = ori_img_width // self.scale
 
-        self.is_train = config['is_train']
         self.output_stride = config['output_stride']
-        self.decay = config['learning_rate_decay']
-        self.decay_step = config['decay_step']
+
+
+        if self.is_train:
+        # All learning rate decay is in `train_op(self, total_loss, global_step)`
+            self.decay_restart = config["decay_restart"]
+            if self.decay_restart is True:
+                self.restart_decay_steps = config["first_decay_epoch"] * config["one_epoch_steps"]
+                self.t_mul = _help_func_dict(config, 't_mul', 2.0)
+                self.m_mul = _help_func_dict(config, 'm_mul', 1.0)            
+            self.optimizer = _help_func_dict(config, 'optimizer', "adam")
+            self.start_learning_rate =config["learning_rate"]
+            self.exponential_decay_step = config["exponential_decay_epoch"] * config["one_epoch_steps"]
+            self.learning_rate_decay = config["learning_rate_decay"]
 
         self.images = tf.placeholder(
                 dtype = tf.float32,
@@ -46,18 +70,32 @@ class Network:
                 )
 
         print("Deeplab:")
-        print("Batch size: {}, Output stride: {}\nNumber of class: {}".format(self.batch_size , self.output_stride,
-            self.class_num))
+
+
+        print("\nIs Training:{}\n\tInput shape: {}\n\tBatch size: {}\n\tOutput shape: {}".format(self.is_train,
+         self.images.shape.as_list(),self.batch_size , self.labels_by_classes.shape.as_list()))
+        
+        if self.is_train:
+            print("#### configuration ######")
+            print("Optimizer: {}\tStart Learning rate: {}\tdecay_restart: {}".format(self.optimizer,
+             self.start_learning_rate, self.decay_restart) )
         # self.miou = tf.placeholder(tf.float32, shape=(), name="valid_miou")
         # self.valid_miou = tf.summary.scalar("valid_miou", self.miou )
     def loss(self):
         """
-        损失函数  
+        Return the loss function    
         """
         return tf.add( tf.add_n(tf.get_collection('losses'))  , 
             tf.reduce_sum(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)) , name = "total_loss")
 
     def add_to_loss(self , predicts ):
+        """
+        Goal: compute the loss with giving predicts
+
+        params:
+            predicts: The prediction tensor
+    
+        """
 
         valid_indices = tf.where(tf.not_equal(self.labels , -1))
 
@@ -70,6 +108,17 @@ class Network:
 
         cross_entropies = tf.nn.softmax_cross_entropy_with_logits_v2(logits=valid_logits,
                                                                      labels=valid_labels)
+        # #Weighted loss
+        # # your class weights
+        # class_weights = np.ones((1,self.class_num)) * 10.0
+        # class_weights[0,0] = 1.0
+        # # class_weights = tf.constant([[1.0, 1.0]])
+        # # deduce weights for batch samples based on their true label
+        # weights = tf.reduce_sum(class_weights * valid_labels, axis=1)
+        # # print(valid_labels.shape)
+        # weighted_losses = cross_entropies * weights
+        # print("weight loss")
+
         cross_entropy_tf = tf.reduce_mean(cross_entropies)
         tf.add_to_collection("losses", cross_entropy_tf)
 
@@ -99,17 +148,40 @@ class Network:
         """
         self._loss_summary(total_loss)
 
-        self.learning_rate = tf.train.exponential_decay(self.start_learning_rate, global_step,
-                                                   self.decay_step, self.decay, staircase=True)
+        #####The learning rate decay method
 
-        optimizer = tf.train.MomentumOptimizer(learning_rate=self.learning_rate, momentum = 0.9)
-        grads = optimizer.compute_gradients(total_loss)
+        if self.decay_restart:
+            # Cosine decay and restart
+            # print("decayn restart: {}".format(self.restart_decay_steps))
+            self.learning_rate = tf.train.cosine_decay_restarts(self.start_learning_rate, global_step,
+             self.restart_decay_steps, t_mul = self.t_mul , m_mul = self.m_mul)
+        else:
+            # exponential_decay
+            # print("expotineal decayn: {}".format(self.exponential_decay_step))
+            self.learning_rate = tf.train.exponential_decay(self.start_learning_rate, global_step,
+                                                       self.exponential_decay_step, self.learning_rate_decay, staircase=True)
 
-        apply_gradient_op = optimizer.apply_gradients(grads, global_step=global_step)    
+        ##### Select the optimizer
+        if self.optimizer == 'adam':
+            optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
+        elif self.optimizer == 'sgd':
+            optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate)
+        elif self.optimizer == 'rmsprop':
+            optimizer = tf.train.RMSPropOptimizer(learning_rate=self.learning_rate)
 
+        # grads = optimizer.compute_gradients(total_loss)
+        # apply_gradient_op = optimizer.apply_gradients(grads, global_step=global_step)  
+          
+        self.update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        with tf.control_dependencies(self.update_ops):
+            apply_gradient_op = optimizer.minimize(total_loss, global_step)
+
+
+        tf.summary.scalar("learning_rate", self.learning_rate, collections = ['train'])
         return apply_gradient_op
 
-    ###存储与恢复参数checkpoint####
+
+    ### Ckpt save and restore ####
     def save(self, sess, saver, filename, global_step):
         path = saver.save(sess, self.params_dir+filename, global_step=global_step)
         print ("Save params at " + path)
@@ -117,15 +189,42 @@ class Network:
     def restore(self, sess, saver, filename):
         print ("Restore from previous model: ", self.params_dir+filename)
         saver.restore(sess, self.params_dir+filename)
-    ###存储loss 和 中间的图片进入log###
+    ## Save training log and summary ###
     def _loss_summary(self, loss):
-        tf.summary.scalar(loss.op.name + "_raw", loss)
+        """
+        Save the loss to summary log
+        """
+        with tf.device(self.cpu):
+            with tf.name_scope('train_loss'):
+                tf.summary.scalar(loss.op.name + "_raw", loss,collections=['train'])
 
     def _mIOU_summary(self, predicts):
         p = tf.reshape(tf.argmax(predicts, axis=3) , [self.batch_size,-1])
         l = tf.reshape(self.labels, [self.batch_size,-1])
         miou,self.update_op = tf.metrics.mean_iou(p, l, num_classes=self.class_num)
         # tf.summary.scalar('miou', miou)
+
+    def _create_summary(self):
+        """
+        Goals: Create summaries for training and validation
+
+        e.g, loss for training and valdation.
+        Accuracy
+        Images:
+        """
+        self.valid_loss = tf.placeholder(dtype = tf.float32)
+        self.miou = tf.placeholder(dtype = tf.float32)
+        self.precision = tf.placeholder(dtype = tf.float32)
+        # self.point_pck = tf.placeholder(dtype = tf.float32,
+        #  shape = (self.points_num,))        
+        with tf.device(self.cpu):
+
+            tf.summary.scalar("Valid_loss", self.valid_loss, collections = ['valid'])
+            tf.summary.scalar("Valid_precision", self.precision, collections = ['valid'])
+            tf.summary.scalar("Valid_IOU", self.miou, collections = ['valid'])
+
+        self.valid_summary = tf.summary.merge_all('valid') 
+
     def _image_summary(self, x, channels):
         x = tf.cast(x, tf.float32)
         def sub(batch, idx):  
@@ -144,16 +243,6 @@ class Network:
         for idx in range(channels):
             sub(0, idx)
 
-            
-        # if (self.batch_size > 1):
-        #   for idx in range(channels):
-        #     # the first batch
-        #     sub(0, idx)
-        #     # the last batch
-        #     sub(-1, idx)
-        # else:
-        #   for idx in range(channels):
-        #     sub(0, idx)
 
     def _fm_summary(self, predicts):
       with tf.name_scope("fcn_summary") as scope:
@@ -242,8 +331,13 @@ class Network:
                 if is_train:
                     self.add_to_loss(net)
                     self._fm_summary(net)
-                    self._mIOU_summary(net)
+                    self._create_summary()
                 return net
 
 
 # def training_network(prediction , loss , train_op, sess,config):
+def _help_func_dict(config,key, default_value = None):
+    if key in config:
+        return config[key]
+    else:
+        return default_value

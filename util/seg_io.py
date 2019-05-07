@@ -6,6 +6,7 @@ The
 import json
 import os, sys
 import numpy as np
+import pandas as pd
 from datetime import date
 
 def masks_to_json(masks, path ,names =None):
@@ -78,3 +79,56 @@ def write_seg_result(iou, params , folder ,cor_pred = None):
     f = open(folder+result_name,"w")
     f.write(json.dumps(result ,indent=2 ,sort_keys=True))
     f.close()
+
+
+def write_pred_contours(valid_data , pred_contours , folder,file_name , file_col_name ,
+ write_index = False , is_valid = True ):
+    """
+    Goal: write prediction contours to DATAFRAME csv and return the panda dataframe
+
+    params:
+        valid_data: panda dataframe of validation data. used for giving file name and types
+        pred_contours: prediction contours shape [batch_size , mask class numbers]
+        folder: folder to save
+        file_name: name of the csv file. When is None, function doesn't save the csv
+    """
+    # Get the name and view from Valid data
+    df_file_names = valid_data.df[[file_col_name]]
+    df_file_names = df_file_names.reset_index(drop=True)
+    result = pd.DataFrame(pred_contours, columns = [valid_data.contour_col] )
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+  
+    # if is_valid:
+    #     gt_coords = valid_data.df[valid_data.coords_cols].values
+    #     pred_coord[gt_coords==-1] = -1
+
+    # Write the polygons in if there is given patches_coord
+    # Other wise assign all -1.
+
+    result = pd.concat([df_file_names,result],axis=1)
+
+
+    if file_name is not None:
+        result.to_csv(folder+file_name+".csv" , index =write_index)
+    return result
+
+def network_performance_dataframe(result_dict= {},name = None,
+    mean_iou = None, mean_precision = None, mean_recall = None):
+    """
+    Goals: write value into dictionry, the default value is None
+        which the dict can be used into grid searching result.
+    """
+    remove_keys = ['restore_param_file', 'config_name']
+    for remove_key in remove_keys:
+        if remove_key in result_dict.keys():
+            result_dict.pop(remove_key)
+
+    result_dict['name'] = name
+
+    result_dict['mean_iou'] = mean_iou
+    result_dict['mean_precision'] = mean_precision
+    result_dict['mean_recall'] = mean_recall
+
+    result_dict = {str(k):str(v) for k,v in result_dict.items()}
+    return result_dict
