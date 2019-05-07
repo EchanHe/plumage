@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-
 import os, sys
 import psutil
 
@@ -17,14 +16,8 @@ sys.path.append(util_lib_dir)
 import data_input
 from plumage_config import process_config
 from visualize_lib import *
-from points_util import pred_coords_to_patches,create_rect_on_coords_proportion_length
+from points_util import create_rect_on_coords_proportion_length
 from points_metrics import pck_accuracy
-
-def _help_func_dict(config,key, default_value = None):
-    if key in config:
-        return config[key]
-    else:
-        return default_value
 
 def turn_str_to_patch_coord(patches):
     patches_coords = [0]* patches.shape[0]
