@@ -18,15 +18,27 @@ def mask_to_contour(mask , scale , ignore_mask_channel):
     channel_list = []
     for channel in range(0,mask.shape[-1]):
         if channel not in ignore_mask_channel:
-            contours = measure.find_contours(mask[...,channel],0.5)
+            _, contours, hierarchy = cv2.findContours(mask[...,channel].astype("uint8"),cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
             contours_list = []
-            if len(contours)==0:
-                print(0)
-                print(np.sum(mask[...,channel]))
-            for contour in contours:
-                contour = (np.flip(contour,axis = 1)*scale).astype(int)
-                contour = contour.ravel().tolist()
-                contours_list+=[contour]
+            for cons in contours:
+                contour_list=[]
+                for pts in cons:
+            #         print(pts)
+                    contour_list.append(pts[0][0]*scale)
+                    contour_list.append(pts[0][1]*scale)
+                contours_list.append(contour_list)
+            
+            
+            #contours = measure.find_contours(mask[...,channel],0.5)
+            # contours_list = []
+            # if len(contours)==0:
+            #     print(0)
+            #     print(np.sum(mask[...,channel]))
+            # for contour in contours:
+            #     contour = (np.flip(contour,axis = 1)*scale).astype(int)
+            #     contour = contour.ravel().tolist()
+            #     contours_list+=[contour]
+
             contours_list = str(contours_list)[1:-1]
             channel_list += [contours_list]    
     return channel_list
