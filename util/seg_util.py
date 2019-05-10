@@ -20,26 +20,29 @@ def mask_to_contour(mask , scale , ignore_mask_channel):
         if channel not in ignore_mask_channel:
             _, contours, hierarchy = cv2.findContours(mask[...,channel].astype("uint8"),cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
             contours_list = []
-            for cons in contours:
-                contour_list=[]
-                for pts in cons:
-            #         print(pts)
-                    contour_list.append(pts[0][0]*scale)
-                    contour_list.append(pts[0][1]*scale)
-                contours_list.append(contour_list)
-            
-            
-            #contours = measure.find_contours(mask[...,channel],0.5)
-            # contours_list = []
-            # if len(contours)==0:
-            #     print(0)
-            #     print(np.sum(mask[...,channel]))
-            # for contour in contours:
-            #     contour = (np.flip(contour,axis = 1)*scale).astype(int)
-            #     contour = contour.ravel().tolist()
-            #     contours_list+=[contour]
+            if len(contours)>0:
+                for cons in contours:
+                    contour_list=[]
+                    for pts in cons:
+                #         print(pts)
+                        contour_list.append(pts[0][0]*scale)
+                        contour_list.append(pts[0][1]*scale)
+                    contours_list.append(contour_list)
+                
+                
+                #contours = measure.find_contours(mask[...,channel],0.5)
+                # contours_list = []
+                # if len(contours)==0:
+                #     print(0)
+                #     print(np.sum(mask[...,channel]))
+                # for contour in contours:
+                #     contour = (np.flip(contour,axis = 1)*scale).astype(int)
+                #     contour = contour.ravel().tolist()
+                #     contours_list+=[contour]
 
-            contours_list = str(contours_list)[1:-1]
+                contours_list = str(contours_list)[1:-1]
+            else:
+                contours_list = np.nan
             channel_list += [contours_list]    
     return channel_list
 def resize_segs(segs ,  width, height):
@@ -80,14 +83,15 @@ def to_convex_hull(pred_segs):
     
     return np.argmax(masks_convex_hull , 3)
 
-def segs_to_masks(segs):
+def segs_to_masks(segs,n_cl=None):
     assert len(segs.shape) ==3 , "Make sure input is [batch_size , height, width]"
     df_size = segs.shape[0]
     # if n_cl is None:
     #     cl, n_cl = extract_classes(segs[0,...] )
     # else:
     #     cl, _ = extract_classes(segs[0,...] )
-    n_cl = np.max(segs) + 1
+    if n_cl is None:
+        n_cl = np.max(segs) + 1
 
     masks = np.zeros((segs.shape[0] , segs.shape[1] , segs.shape[2] , n_cl))
     for i in np.arange(df_size):

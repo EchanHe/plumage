@@ -128,7 +128,7 @@ class plumage_data_input:
     #---- basic config ----
     # contour_col = ["poly.outline" ]
 
-    contour_col = "outline"
+    contour_col = ["outline"]
     obs_col = "obstruction"
 
 
@@ -138,7 +138,9 @@ class plumage_data_input:
     #---basic config ---
     def __init__(self,df,batch_size,is_train,pre_path, state,file_col,
         scale=1 ,is_aug = False , heatmap_scale = 4,cols_num_per_coord =2,
-         view = 'all', no_standard = False , train_ids = None, coords_cols_override = None , default_coords_cols = False):
+         view = 'all', no_standard = False , train_ids = None,
+          coords_cols_override = None , default_coords_cols = False , 
+          contour_col_override = None):
         """
         init function for the data
         
@@ -179,6 +181,10 @@ class plumage_data_input:
         else:
             self.coords_cols = return_coords_cols(view = view , no_standard = no_standard, train_ids = train_ids)
         
+        if contour_col_override is not None:
+            self.contour_col = contour_col_override
+
+
         self.cols_num_per_coord = cols_num_per_coord
         self.lm_cnt = int(len(self.coords_cols) /  self.cols_num_per_coord)
         self.points_names = [name[:-2] for name in self.coords_cols[0::self.cols_num_per_coord]]
@@ -219,7 +225,7 @@ class plumage_data_input:
             self.output_channel = len(self.patches_cols) + 1
 
         elif self.state =='contour':
-            self.output_channel = 2
+            self.output_channel = len(self.contour_col) + 1
             print("\tThe outline mask shape: {}*{}*{}".format(self.img_width//(self.scale),
               self.img_height//(self.scale), self.output_channel ))
         
@@ -269,7 +275,7 @@ class plumage_data_input:
                 if self.state =='patches':
                     y_mini = self.get_y_patches(df_mini)
                 elif self.state =='contour':
-                    y_mini = self.get_y_contour(df_mini)
+                    y_mini = self.get_y_mask_with_contour(df_mini)
                 if self.is_aug:
                     x_mini , y_mini = self.get_x_masks_aug(x_mini , y_mini)
                 #print("The mask :" ,check_masks(y_mini))
@@ -319,7 +325,7 @@ class plumage_data_input:
                 y_mini = self.get_y_patches(df_mini)
                 return x_mini , y_mini
             elif self.state =='contour':
-                y_mini = self.get_y_contour(df_mini)
+                y_mini = self.get_y_mask_with_contour(df_mini)
                 return x_mini , y_mini
         else:
             return x_mini
@@ -363,7 +369,7 @@ class plumage_data_input:
                 y_mini = self.get_y_patches(df_mini)
                 return x_mini , y_mini
             elif self.state =='contour':
-                y_mini = self.get_y_contour(df_mini)
+                y_mini = self.get_y_mask_with_contour(df_mini)
                 return x_mini , y_mini
         else:
             return x_mini
@@ -513,7 +519,41 @@ class plumage_data_input:
             output_map[row,label_row==0,0] =1      
         return output_map
 
-    
+    def get_y_mask_with_contour(self,df):
+        """
+        Goal: Return the masks by using contours of data
+
+        Contours [x,y,x,y],[x,y,x,y]
+        """
+        scale = self.scale
+        contour_col = self.contour_col
+
+        width = int(self.img_width/scale)
+        height = int(self.img_height/scale)
+        output_map = np.zeros((df.shape[0] , height,width, self.output_channel))
+
+
+        contours_coords = df[contour_col].values
+
+        for row in np.arange(contours_coords.shape[0]):
+            for col in np.arange(contours_coords.shape[1]): 
+                contour_coords = contours_coords[row,col]
+                if type(contour_coords) is str:
+                    mask = np.zeros((height, width))
+                    contour_coords = str_to_array(contour_coords)
+                    for contour_coord in contour_coords:
+                        mask_temp = np.zeros((height, width))
+                        outline_coord = [[x//scale,y//scale] for (x,y) in zip(contour_coord[::2], contour_coord[1::2])]
+                        outline_coord = np.expand_dims(outline_coord , axis = 0)
+                        cv2.fillPoly(mask_temp, outline_coord, 1)
+                        mask = np.logical_xor(mask , mask_temp)
+                    output_map[row, :,:,col+1] = mask.astype('uint8')
+        
+            label_row = np.argmax(output_map[row, ...],axis=2)
+            output_map[row,label_row==0,0] =1 
+
+        return output_map.astype('uint8')
+
     def get_y_contour_old_data_format(self, df):
         #Get the contour
         scale = self.scale

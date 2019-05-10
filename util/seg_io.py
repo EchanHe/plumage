@@ -93,9 +93,10 @@ def write_pred_contours(valid_data , pred_contours , folder,file_name , file_col
         file_name: name of the csv file. When is None, function doesn't save the csv
     """
     # Get the name and view from Valid data
-    df_file_names = valid_data.df[[file_col_name]]
+    # df_file_names = valid_data.df[[file_col_name]]
+    df_file_names = valid_data.df.drop(valid_data.contour_col , axis=1 , errors = 'ignore')
     df_file_names = df_file_names.reset_index(drop=True)
-    result = pd.DataFrame(pred_contours, columns = [valid_data.contour_col] )
+    result = pd.DataFrame(pred_contours, columns = valid_data.contour_col )
     if not os.path.exists(folder):
         os.makedirs(folder)
   

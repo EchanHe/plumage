@@ -24,33 +24,45 @@ util_lib_dir= os.path.abspath(os.path.join(dirname,"../../util"))
 sys.path.append(input_lib_dir)
 sys.path.append(util_lib_dir)
 import data_input
-from plumage_config import process_config , save_config
+from plumage_config import process_config
 from visualize_lib import *
-from seg_io import masks_to_json
-from seg_util import  segs_to_masks
+from seg_io import write_pred_contours
+from seg_util import  segs_to_masks, masks_to_contours
 import seg_metrics
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 
 print('--Parsing Config File')
 params = process_config('config_valid.cfg')
 
-model = network.Network(params)
+
+
+
+df_pred = pd.read_csv(params['input_file'])
+print("Read csv data from: ",params['input_file'], "in folder:", params['img_folder'])
+
+valid_data = data_input.plumage_data_input(df_pred,batch_size=params['batch_size'],is_train =False,
+                           pre_path =params['img_folder'],state=params['data_state'],file_col = params['file_col'],
+                           scale=params['scale'] ,is_aug = False,
+                           heatmap_scale = params['output_stride'],
+                           contour_col_override = params.setdefault('contour_col_override', None))
+
+
+if 'is_valid' in params:
+    is_valid = params['is_valid']
+else:
+    is_valid = False
+
+
+model = network.Network(params,valid_data.img_width, valid_data.img_height, is_train = False)
 predict = model.deeplab_v3()
 
-
-valid_csv = pd.read_csv(params['valid_file'])
-print("Read csv data from: ",params['valid_file'], "in folder:", params['img_folder'])
-valid_data = data_input.plumage_data_input(valid_csv,
-                                    batch_size=params['batch_size'],is_train =True,
-                                    pre_path =params['img_folder'],state=params['data_state'],
-                                    scale=params['scale'] ,is_aug = params['img_aug'])
 
 
 restore_file = params['restore_param_file']
 initialize = params['init']
 saver = tf.train.Saver()
 init_op = tf.global_variables_initializer()
-
 # Generate the result from model
 with tf.Session() as sess:
     if initialize:
@@ -62,55 +74,58 @@ with tf.Session() as sess:
         sess.run(init_op)
         saver.restore(sess, restore_file)
 
-    # Validation step
-    result_valid = np.zeros((valid_data.df_size , predict.shape[1] , predict.shape[2]))
-    gt_valid = np.zeros((valid_data.df_size , predict.shape[1] , predict.shape[2]))
-    if params['save_img']:
-        img_all = np.zeros((valid_data.df_size , predict.shape[1] , predict.shape[2] ,3 ))
-
-    for i_df_valid in np.arange(0,valid_data.df_size,params["batch_size"]):
-        x, y_valid= valid_data.get_next_batch_no_random()
-        y_valid_segs = np.argmax(y_valid,axis = 3)
+    #Generate predictions from trained network
+    pred_contours = np.zeros((0, 1))
+    for i_df_valid in np.arange(0,valid_data.df.shape[0],valid_data.batch_size):
+        x = valid_data.get_next_batch_no_random()
         feed_dict = {
-            model.images: x
-            }            
-        result_mini = np.argmax(sess.run(predict, feed_dict=feed_dict) , axis = 3)
-       
-        result_valid[i_df_valid:i_df_valid+params["batch_size"],...] = result_mini
-        gt_valid[i_df_valid:i_df_valid+params["batch_size"],...] = y_valid_segs
+            model.images: x,
 
-        if params['save_img']:
-            img_all[i_df_valid:i_df_valid+params["batch_size"],...] = x
+            }      
+        result_mini = np.argmax(sess.run(predict, feed_dict=feed_dict) ,axis =3)   
+        mask_mini = segs_to_masks(result_mini)
+        pred_contours_mini = masks_to_contours(mask_mini , scale = params['scale'])
+        pred_contours = np.vstack((pred_contours, pred_contours_mini))  
+    pred_contours = pred_contours[:valid_data.df_size,...] 
 
-result_valid = result_valid.astype('uint8')
+    predicted_result = write_pred_contours(valid_data , pred_contours ,
+        folder = params['valid_result_dir'],
+        file_name = params['result_name'], file_col_name = params['file_col'])
 
-#Write the images
-if params['save_img']:
-    print("save into images into: ", params['visualize_img'])
-    img_all = img_all.astype('uint8')
-    save_masks_on_image(img_all ,result_valid ,
-        save_path =params['visualize_img'], 
-        fig_names= valid_csv['file.vis'].values)
-    save_pred_diff_on_image(img_all ,gt_valid, result_valid , 1 , 
-        save_path =params['visualize_img'], 
-        fig_names= valid_csv['file.vis'].values)
+if set(valid_data.contour_col).issubset(df_pred.columns) and is_valid:
 
-json_file = params['result_dir']+"{}_result_{}.json".format(params['name'] , params['valid_file'].split('/')[-1])
-masks_to_json(segs_to_masks(result_valid),json_file , valid_csv["file.vis"].values)
+    valid_data = data_input.plumage_data_input(df_pred,batch_size=params['batch_size'],is_train =True,
+                           pre_path =params['img_folder'],state=params['data_state'],file_col = params['file_col'],
+                           scale=params['scale'] ,is_aug = False,
+                           heatmap_scale = params['output_stride'],
+                           contour_col_override = params.setdefault('contour_col_override', None))
 
+    result_data = data_input.plumage_data_input(predicted_result,batch_size=params['batch_size'],is_train =True,
+                           pre_path =params['img_folder'],state=params['data_state'],file_col = params['file_col'],
+                           scale=params['scale'] ,is_aug = False,
+                           heatmap_scale = params['output_stride'],
+                           contour_col_override = params.setdefault('contour_col_override', None))
 
-# Print the accuracy:
-acc_iou = seg_metrics.segs_eval(result_valid,gt_valid,mode="miou")
-acc_cor_pred = seg_metrics.segs_eval(result_valid,gt_valid,mode="correct_pred")
-print("acc_iou",acc_iou )
-print("acc_cor_pred : {}\n".format(acc_cor_pred))
-for view in valid_csv['view'].unique():
-    # valid_csv.loc[valid_csv['view'] == 'back' , :].i
-    index = np.where(valid_csv['view'] == view)[0]
-    pred_result = result_valid[index,...]
-    gt_result = gt_valid[index,...]
-    acc_iou = seg_metrics.segs_eval(pred_result,gt_result,mode="miou")
-    acc_cor_pred = seg_metrics.segs_eval(pred_result,gt_result,mode="correct_pred")
-    print("{} accuracy".format(view))
-    print("acc_iou",acc_iou )
-    print("acc_cor_pred : {}\n".format(acc_cor_pred))
+    miou_list = np.array([])
+    cor_pred_list =np.array([])
+    recall_list = np.array([])
+    for i_df_valid in np.arange(0,valid_data.df.shape[0],valid_data.batch_size):
+        _,y_valid_mini = valid_data.get_next_batch_no_random()
+        _,y_result_mini = result_data.get_next_batch_no_random()
+
+        y_valid_mini = np.argmax(y_valid_mini,axis =3) 
+        y_result_mini = np.argmax(y_result_mini,axis =3) 
+
+        acc_iou = seg_metrics.segs_eval(y_result_mini,y_valid_mini,mode="miou" , background = 0)
+        acc_cor_pred = seg_metrics.segs_eval(y_result_mini,y_valid_mini,mode="precision" , background = 0)
+        recall_mini = seg_metrics.segs_eval(y_result_mini,y_valid_mini,mode="recall" , background = 0)
+
+        miou_list = np.append(miou_list,acc_iou)
+        cor_pred_list = np.append(cor_pred_list , acc_cor_pred)
+        recall_list = np.append(recall_list , recall_mini)
+
+    mean_recall = np.mean(recall_list)
+    mean_miou = np.mean(miou_list)
+    mean_cor_pred = np.mean(cor_pred_list)
+
+    print("IOU:{}, precision:{}, Recall:{}".format(mean_miou , mean_cor_pred , mean_recall))
