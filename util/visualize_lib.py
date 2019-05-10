@@ -31,6 +31,54 @@ color_list = [np.array([255,0,0]),
               np.array([0,255,255]) ,
               np.array([255,0,255])
               ]
+inter_color_list = [np.array([255,0,0]),
+                    np.array([0,255,0]),
+                    np.array([0,0,255]) ]
+def show_one_masks(plt, img, pred_mask, gt_mask, fig_name = "", save_path = None, 
+    show_fig_title = True , format = 'png'):
+    """
+    Plot the gt or pred mask on top of a image
+
+    params:
+        plt : pyplot
+        img: [height, width, 3]
+        gt / pred mask: [height, width]
+
+
+    """
+    if show_fig_title:
+        plt.title(fig_name , fontsize = 20)
+
+
+    alpha = 0.3
+    
+
+    intersection = np.logical_and(gt_mask , pred_mask)
+    
+    color_result = np.zeros((intersection.shape))
+    color_result[pred_mask==True] = 1
+    color_result[gt_mask==True] = 2
+    color_result[intersection==True] = 3
+
+    ori_image = img.copy()
+    for i_color in range(1,4):
+        for c in range(3):
+            img[:, :, c] = np.where(color_result == i_color,
+                              ori_image[:, :, c] * (1 - alpha) + alpha * inter_color_list[i_color-1][c] ,
+                              img[:, :, c])
+        
+    
+    # if img is not None:
+    plt.imshow(img)
+
+    if save_path is not None:
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        plt.axis('off')
+        plt.savefig(save_path + fig_name+'.'+format ,bbox_inches='tight',format = format)
+        plt.close("all")
+        plt.clf()
+
 
 
 def save_masks_on_image(images, pred_segs, save_path, fig_names=None):
@@ -79,9 +127,7 @@ def save_masks_on_image(images, pred_segs, save_path, fig_names=None):
         plt.close(fig)
 
 
-inter_color_list = [np.array([255,0,0]),
-                    np.array([0,255,0]),
-                    np.array([0,0,255]) ]
+
 def save_pred_diff_on_image(images, gt_segs, pred_segs , c , save_path , fig_names=None):
     """
     Save ground truth, prediction and their intersection of a certain class on image into figure

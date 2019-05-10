@@ -17,14 +17,8 @@ sys.path.append(util_lib_dir)
 import data_input
 from plumage_config import process_config
 from visualize_lib import *
-from points_util import pred_coords_to_patches,create_rect_on_coords_proportion_length
-from points_metrics import pck_accuracy
 
-def _help_func_dict(config,key, default_value = None):
-    if key in config:
-        return config[key]
-    else:
-        return default_value
+
 
 def turn_str_to_patch_coord(patches):
     patches_coords = [0]* patches.shape[0]
@@ -60,6 +54,19 @@ def str_to_array(s):
         result = [result]
     return result
 
+def contour_to_mask(contour_coords , scale , img):
+    height,width, _ = img.shape
+    mask = np.zeros((height, width))
+    for contour_coord in contour_coords:
+        mask_temp = np.zeros((height, width))
+        outline_coord = [[x//scale,y//scale] for (x,y) in zip(contour_coord[::2], contour_coord[1::2])]
+        outline_coord = np.expand_dims(outline_coord , axis = 0)
+        cv2.fillPoly(mask_temp, outline_coord, 1)
+        mask = np.logical_xor(mask , mask_temp)
+    return mask.astype('uint8')
+
+
+
 args = sys.argv
 if len(args)==2:
     config_name = args[1]
@@ -83,12 +90,13 @@ batch_size =  params['batch_size']
 file_col = params['file_col']
 
 
+save_mask = params['save_mask']
 
 output_format = params['output_format']
 
 gt_df = pd.read_csv(gt_file)
 pred_df = pd.read_csv(pred_file)
-pred_df = pred_df[:1]
+
 
 # 
 gt_df = pd.merge(pred_df[[file_col]],gt_df, on=[file_col])
@@ -97,19 +105,25 @@ pred_df = pred_df.sort_values(by=[file_col])
 
 
 gt_outlines = gt_df['outline'].values
-pred_outlines = pred_df['obstruction'].values
+pred_outlines = pred_df['outline'].values
 file_names = gt_df[file_col].values
 
 for i in range(0, gt_df.shape[0] , batch_size):
 
+    print(i)
     pred_outline = str_to_array(pred_outlines[i])
     gt_outline = str_to_array(gt_outlines[i])
 
 
 
     filename = file_names[i]
-    img = cv2.imread(img_path + filename)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) 
+
+    try:
+        img = cv2.imread(img_path + filename)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    except:
+        print("file not exist: " + img_path+filename)
+        continue 
     if scale!=1:
         img = cv2.resize(img, dsize=(img.shape[1]//scale,img.shape[0]//scale), interpolation=cv2.INTER_CUBIC)
 
@@ -124,31 +138,19 @@ for i in range(0, gt_df.shape[0] , batch_size):
     
 
     fig  = plt.figure(figsize=(15, 8))
-    
-    ###############
-    if "region" in pred_df.columns:
-        new_save_path = save_path+pred_df.region.values[i] +"/"
+
+    if save_mask:
+        gt_mask = contour_to_mask(gt_outline, scale , img)
+        pred_mask = contour_to_mask(pred_outline, scale, img)
+        show_one_masks(plt, img, pred_mask = pred_mask, gt_mask = gt_mask
+            , fig_name = filename,  save_path = save_path, 
+            show_fig_title = True , format = output_format)
     else:
-        new_save_path = save_path
-
-    if ("intensity_diff" in pred_df.columns) and ("pixel_diff" in pred_df.columns):
-
-        plt.text(0.5,0.95, "{} intensity_diff: {}".format(pred_df.region.values[i],pred_df.intensity_diff.values[i]),
-            fontdict={'color': "white",'size':12 },
-            transform=plt.gca().transAxes)
-
-        plt.text(0.5,0.90, "{} pixel_diff: {}".format(pred_df.region.values[i],pred_df.pixel_diff.values[i]),
-            fontdict={'color': "white",'size':12 },
-            transform=plt.gca().transAxes)
-    ############
-
-
-    show_one_markup(plt, img, pred_coord = None, pred_patch = pred_outline, pred_contour = None,
-    gt_coord =None, gt_patch = gt_outline, gt_contour = None, pck_threshold =None, 
-     fig_name = filename , save_path =new_save_path ,
-      show_patch_labels = False , show_colour_labels = False , show_fig_title = False,
-      linewidth = 3, format = output_format)
-
+        show_one_markup(plt, img, pred_coord = None, pred_patch = pred_outline, pred_contour = None,
+        gt_coord =None, gt_patch = gt_outline, gt_contour = None, pck_threshold =None, 
+         fig_name = filename , save_path =save_path ,
+          show_patch_labels = False , show_colour_labels = False , show_fig_title = False,
+          linewidth = 3, format = output_format)
 
 
      
