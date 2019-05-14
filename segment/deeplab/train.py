@@ -15,7 +15,7 @@ import datetime
 
 from sklearn.model_selection import train_test_split, KFold
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0' 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 
 dirname = os.path.dirname(__file__)
 input_lib_dir= os.path.abspath(os.path.join(dirname,"../../input"))
@@ -98,15 +98,13 @@ def create_data(params, df_train, df_valid):
     print("Read training data ....")
     train_data = data_input.plumage_data_input(df_train,batch_size=params['batch_size'],is_train =params['is_train'],
                                 pre_path =params['img_folder'],state=params['data_state'],file_col = params['file_col'],
-                                scale=params['scale'] ,no_standard = False ,
-                                coords_cols_override = None,
-                                default_coords_cols = False)
+                                scale=params['scale'] ,
+                                contour_col_override = params.setdefault('contour_col_override', None))
     print("Read valid data ....\n")
     valid_data = data_input.plumage_data_input(df_valid,batch_size=params['batch_size'],is_train =params['is_train'],
                                 pre_path =params['img_folder'],state=params['data_state'], file_col = params['file_col'],
-                                scale=params['scale'],no_standard = False ,
-                                coords_cols_override = None,
-                                default_coords_cols = False)
+                                scale=params['scale'],
+                                contour_col_override = params.setdefault('contour_col_override', None))
     extract_config_name(params)
     return train_data, valid_data
 
@@ -161,7 +159,13 @@ def trainining(params, train_data, valid_data):
                 # print("\tGlobal steps and learning rates: {}  {}".format(tmp_global_step,lear))
                 temp_summary = sess.run(train_summary, feed_dict=feed_dict)    
                 writer.add_summary(temp_summary, tmp_global_step)
- 
+                
+                # For the eye detection part
+                # result_mini = np.argmax(sess.run(predict, feed_dict=feed_dict) ,axis =3)   
+                # print(seg_metrics.segs_eval(result_mini,np.argmax(y_train,axis = 3),mode="miou" , background = 0))
+                # print(seg_metrics.segs_eval(result_mini,np.argmax(y_train,axis = 3),mode="precision" , background = 0))
+                # print(np.sum(result_mini==1))
+                # print(np.sum(np.argmax(y_train,axis = 3)==1))
             ######Validating the result part#####    
             if (i+1) % params["valid_steps"] ==0 or i == 0:
                 #Validation part
@@ -241,8 +245,11 @@ def get_and_eval_result(params, valid_data):
                 }      
             result_mini = np.argmax(sess.run(predict, feed_dict=feed_dict) ,axis =3)   
             mask_mini = segs_to_masks(result_mini)
+            #print(mask_mini.shape)
             pred_contours_mini = masks_to_contours(mask_mini , scale = params_valid['scale'])
+            #print(pred_contours_mini.shape)
             pred_contours = np.vstack((pred_contours, pred_contours_mini))  
+
 
 
             result_mini = np.argmax(mask_mini ,axis =3)       
@@ -263,7 +270,7 @@ def get_and_eval_result(params, valid_data):
 
     write_pred_contours(valid_data , pred_contours ,
         folder = params_valid['valid_result_dir']+"grid_temp/",
-        file_name = params['config_name'], file_col_name = params['file_col'],)
+        file_name = params['config_name'], file_col_name = params['file_col'])
 
     result_dict = network_performance_dataframe(result_dict = params_valid,
         mean_iou = mean_miou, mean_precision = mean_cor_pred, mean_recall = mean_recall)
