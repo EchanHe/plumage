@@ -13,7 +13,6 @@ input_lib_dir= os.path.abspath(os.path.join(dirname,"../input"))
 util_lib_dir= os.path.abspath(os.path.join(dirname,"../util"))
 sys.path.append(input_lib_dir)
 sys.path.append(util_lib_dir)
-import data_input
 from plumage_config import process_config
 from visualize_lib import *
 from points_util import create_rect_on_coords_proportion_length
@@ -34,7 +33,7 @@ args = sys.argv
 if len(args)==2:
     config_name = args[1]
 else:
-    config_name = 'plot.cfg'
+    config_name = 'points_plot.cfg'
 print('--Parsing Config File: {}'.format(config_name))
 
 params = process_config(os.path.join(dirname, config_name))
@@ -49,11 +48,12 @@ img_path = params["img_folder"]
 save_path = params["save_path"]
 
 scale = params['scale']
-batch_size =  params['batch_size']
 file_col = params['file_col']
 
 plot_patches = params['plot_patches']
 coords_cols = params['cols_override']
+label_names = np.array(coords_cols)[0::2]
+
 output_format = params['output_format']
 
 gt_df = pd.read_csv(gt_file)
@@ -69,7 +69,8 @@ pred_df = pred_df.sort_values(by=[file_col])
 gt_coords = gt_df[coords_cols].values
 pred_coords = pred_df[coords_cols].values
 file_names = gt_df[file_col].values
-for i in range(0, gt_df.shape[0] , batch_size):
+print("{} images will be saved in {}".format(pred_df.shape[0] , save_path))
+for i in range(0, gt_df.shape[0]):
 
     pred_coord = pred_coords[i]
     gt_coord = gt_coords[i]
@@ -120,13 +121,13 @@ for i in range(0, gt_df.shape[0] , batch_size):
         if plot_patches:
             show_one_markup(plt, img, pred_coord = pred_coord[:10,...], pred_patch = pred_patch, pred_contour = None,
             gt_coord =gt_coord[:10:,...], gt_patch = gt_patch, gt_contour = None, pck_threshold =None, 
-             fig_name = filename , LM_CNT =5, save_path =new_save_path ,
+             fig_name = filename , LM_CNT =5, save_path =new_save_path ,label_names = label_names,
               show_patch_labels = False , show_colour_labels = False , show_fig_title = False,
               format = output_format)
         else:
             show_one_markup(plt, img, pred_coord = pred_coord, pred_patch = None, pred_contour = None,
             gt_coord =gt_coord, gt_patch = None, gt_contour = None, pck_threshold =None, 
-             fig_name = filename , LM_CNT =len(coords_cols)//2, save_path =new_save_path ,
+             fig_name = filename , LM_CNT =len(coords_cols)//2, save_path =new_save_path ,label_names = label_names,
               show_patch_labels = True , show_colour_labels = False , show_fig_title = False,
               format = output_format)
     else:    
@@ -141,14 +142,14 @@ for i in range(0, gt_df.shape[0] , batch_size):
 
                     show_one_markup(plt, img, pred_coord = pred_coord, pred_patch = None, pred_contour = None,
                         gt_coord =gt_coord, gt_patch = None, gt_contour = None, pck_threshold =100, 
-                            fig_name = filename , LM_CNT =15, save_path =new_save_path )
+                            fig_name = filename , LM_CNT =15, save_path =new_save_path,label_names = label_names, )
 
             if coord >= distances[-1]:
                 new_save_path =save_path + "{}_/{}/".format( distances[-1] , gt_data.points_names[idx]  ) 
 
                 show_one_markup(plt, img, pred_coord = pred_coord, pred_patch = None, pred_contour = None,
                         gt_coord =gt_coord, gt_patch = None, gt_contour = None, pck_threshold =100, 
-                            fig_name = filename , LM_CNT =15, save_path =new_save_path )
+                            fig_name = filename , LM_CNT =15, save_path =new_save_path,label_names = label_names, )
 
      
         

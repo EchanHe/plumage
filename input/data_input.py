@@ -151,7 +151,7 @@ class plumage_data_input:
             pre_path: The image folder
             State: The labels to read with giving state
             scale: The scale for downsampling the images
-            is_aug: Whether augment the data
+            is_aug: Whether augment the data (Not use any more)
             
         """
         self.df  = df.copy()
@@ -208,8 +208,6 @@ class plumage_data_input:
         print("Init data class...")
         print("\tOrignal Data shape: {}\n\tData shape: {}\n\tbatch_size:{}\n\tscale:{}\n\tImage original resolution: {}*{}\n\tscaled resolution: {}*{}"\
             .format(df.shape[0],self.df_size, self.batch_size,self.scale ,self.img_width , self.img_height, self.img_width//self.scale , self.img_height//self.scale))
-
-        print("Image Augmentation:{}\n\tAugmentation option:".format(self.is_aug, self.aug_option))
       
         
         assert state in self.STATE_OPTIONS, "State is not in {}".format(self.STATE_OPTIONS)
@@ -223,7 +221,6 @@ class plumage_data_input:
             self.output_channel = int(len(self.coords_cols) /  self.cols_num_per_coord)
         elif self.state =='patches':
             self.output_channel = len(self.patches_cols) + 1
-
         elif self.state =='contour':
             self.output_channel = len(self.contour_col) + 1
             print("\tThe outline mask shape: {}*{}*{}".format(self.img_width//(self.scale),
@@ -260,14 +257,12 @@ class plumage_data_input:
         if is_train:
             # Return a batch of coords
             if self.state =='coords':
-                if self.is_aug:
-                    x_mini, df_mini = self.get_x_df_aug(df_mini)
-                else:
-                    x_mini = self.get_x_img(df_mini)
-                
+
+                x_mini = self.get_x_img(df_mini)        
                 y_mini = self.get_y_map(df_mini)
                 coords_mini = self.get_y_coord(df_mini , 1 , True)
                 vis_mini = self.get_y_vis_map(df_mini)
+
                 return x_mini , y_mini, coords_mini,vis_mini
             else:
                 x_mini = self.get_x_img(df_mini)
@@ -276,8 +271,7 @@ class plumage_data_input:
                     y_mini = self.get_y_patches(df_mini)
                 elif self.state =='contour':
                     y_mini = self.get_y_mask_with_contour(df_mini)
-                if self.is_aug:
-                    x_mini , y_mini = self.get_x_masks_aug(x_mini , y_mini)
+
                 #print("The mask :" ,check_masks(y_mini))
                 if check_masks(y_mini) ==False:
                     y_mini = segs_to_masks(np.argmax(y_mini , 3) , self.output_channel)
@@ -523,7 +517,9 @@ class plumage_data_input:
         """
         Goal: Return the masks by using contours of data
 
-        Contours [x,y,x,y],[x,y,x,y]
+        Contours format '[x,y,x,y],[x,y,x,y]'
+
+        return mask of (Data size, height,width, Output channel)
         """
         scale = self.scale
         contour_col = self.contour_col

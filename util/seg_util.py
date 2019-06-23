@@ -53,6 +53,8 @@ def resize_segs(segs ,  width, height):
         segs [batch, height, width]
         width: width of the segmentations
         height: height of the segmentations
+    
+
     """
     masks = segs_to_masks(segs)
     new_mask = np.zeros((masks.shape[0] , height, width, masks.shape[-1]))
@@ -102,9 +104,13 @@ def segs_to_masks(segs,n_cl=None):
     return masks
 
 #seg [height , width]
-def seg_to_mask(seg):
+def seg_to_mask(seg,n_cl=None):
+
     assert len(seg.shape) ==2 , "Make sure input is [height, width]"
-    cl, n_cl = extract_classes(seg)
+
+    if n_cl is None:
+        n_cl = np.max(segseg) + 1
+    cl, _ = extract_classes(seg)
     return extract_masks(seg , cl, n_cl)
 
 
@@ -114,11 +120,7 @@ Auxiliary functions used during evaluation.
 def get_pixel_area(segm):
     return segm.shape[0] * segm.shape[1]
 
-def extract_both_masks(eval_segm, gt_segm, cl, n_cl):
-    eval_mask = extract_masks(eval_segm, cl, n_cl)
-    gt_mask   = extract_masks(gt_segm, cl, n_cl)
 
-    return eval_mask, gt_mask
 
 def extract_classes(segm):
     cl = np.unique(segm)
@@ -186,3 +188,12 @@ class EvalSegErr(Exception):
 
     def __str__(self):
         return repr(self.value)
+
+# Deprecated
+
+def extract_both_masks(eval_segm, gt_segm, cl, n_cl):
+    print("Deprecated")
+    eval_mask = extract_masks(eval_segm, cl, n_cl)
+    gt_mask   = extract_masks(gt_segm, cl, n_cl)
+
+    return eval_mask, gt_mask

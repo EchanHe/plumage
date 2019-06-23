@@ -249,10 +249,7 @@ def get_and_eval_result(params, valid_data):
             pred_contours_mini = masks_to_contours(mask_mini , scale = params_valid['scale'])
             #print(pred_contours_mini.shape)
             pred_contours = np.vstack((pred_contours, pred_contours_mini))  
-
-
-
-            result_mini = np.argmax(mask_mini ,axis =3)       
+  
             acc_iou = seg_metrics.segs_eval(result_mini,y_valid_segs,mode="miou" , background = 0)
             acc_cor_pred = seg_metrics.segs_eval(result_mini,y_valid_segs,mode="precision" , background = 0)
             recall_mini = seg_metrics.segs_eval(result_mini,y_valid_segs,mode="recall" , background = 0)

@@ -18,17 +18,6 @@ import data_input
 from plumage_config import process_config
 from visualize_lib import *
 
-
-
-def turn_str_to_patch_coord(patches):
-    patches_coords = [0]* patches.shape[0]
-    for row in np.arange(patches.shape[0]):
-        if type(patches[row]) is int:
-            patches_coords[row] =np.array([-1])
-        else:
-            patches_coords[row] = np.array([float(s) for s in patches[row].split(",")])
-
-    return patches_coords
 def str_to_array(s):
     """
     Goal: Cast string array to np array
@@ -71,7 +60,7 @@ args = sys.argv
 if len(args)==2:
     config_name = args[1]
 else:
-    config_name = 'outline.cfg'
+    config_name = 'outline_plot.cfg'
 print('--Parsing Config File: {}'.format(config_name))
 
 params = process_config(os.path.join(dirname, config_name))
@@ -86,7 +75,6 @@ img_path = params["img_folder"]
 save_path = params["save_path"]
 
 scale = params['scale']
-batch_size =  params['batch_size']
 file_col = params['file_col']
 
 
@@ -97,6 +85,8 @@ output_format = params['output_format']
 gt_df = pd.read_csv(gt_file)
 pred_df = pd.read_csv(pred_file)
 
+if "category" in params and params["category"] is not None:
+    pred_df = pred_df.loc[pred_df.view==params["category"],:]
 
 # 
 gt_df = pd.merge(pred_df[[file_col]],gt_df, on=[file_col])
@@ -108,9 +98,10 @@ gt_outlines = gt_df['outline'].values
 pred_outlines = pred_df['outline'].values
 file_names = gt_df[file_col].values
 
-for i in range(0, gt_df.shape[0] , batch_size):
+print("{} images will be saved in {}".format(pred_df.shape[0] , save_path))
 
-    print(i)
+for i in range(0, gt_df.shape[0]):
+
     pred_outline = str_to_array(pred_outlines[i])
     gt_outline = str_to_array(gt_outlines[i])
 
@@ -146,6 +137,10 @@ for i in range(0, gt_df.shape[0] , batch_size):
             , fig_name = filename,  save_path = save_path, 
             show_fig_title = True , format = output_format)
     else:
+        for idx_outline, a in enumerate(pred_outline):
+            pred_outline[idx_outline] = np.divide(a,scale)
+        for idx_outline, a in enumerate(gt_outline):
+            gt_outline[idx_outline] = np.divide(a,scale)
         show_one_markup(plt, img, pred_coord = None, pred_patch = pred_outline, pred_contour = None,
         gt_coord =None, gt_patch = gt_outline, gt_contour = None, pck_threshold =None, 
          fig_name = filename , save_path =save_path ,
