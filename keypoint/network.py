@@ -3,11 +3,14 @@ import tensorflow.contrib.layers as layers
 import numpy as np
 
 class Pose_Estimation:
-    def __init__(self , config,ori_img_width, ori_img_height):
+    def __init__(self , config,ori_img_width, ori_img_height, is_train = None):
         """
         Initialize the model with config and its hyperparameters
         """
-        self.is_train = config['is_train']
+        if is_train is not None:
+            self.is_train = is_train
+        else:
+            self.is_train = config['is_train']
         self.is_grey = config['is_grey']
         self.network_name = config['network_name']
 
@@ -80,7 +83,7 @@ class Pose_Estimation:
             print("#### configuration ######")
             print("Optimizer: {}\tStart Learning rate: {}\tdecay_restart: {}".format(self.optimizer,
              self.start_learning_rate, self.decay_restart) )
-            print("#### Network init finished ######\n")
+
 ################### functions ##########
     def loss(self):
         """

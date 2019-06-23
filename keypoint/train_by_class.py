@@ -14,7 +14,7 @@ from network import _help_func_dict
 import itertools
 from sklearn.model_selection import train_test_split, KFold
 import datetime
-from datetime import date
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0' 
 
 
@@ -32,8 +32,17 @@ from points_io import write_pred_dataframe, build_result_dict
 def read_csv(params):
     ##reading data
     df_all = pd.read_csv(params['input_file'])
-    gb = df_all.groupby("view")
+    
+    # Split training and valdiation data, via category.
+    if 'category_col' in params and params['category_col'] is not None:
+        category_col = params['category_col']
+    else:
+        category_col = "view"
 
+    if category_col not in df_all.columns:
+        df_all[category_col] = 1
+
+    gb = df_all.groupby("view")
     if params['kfold'] ==None:
         print("train_test_split with seed:",params['split_seed'] )
         # train_test_split split option
@@ -51,10 +60,7 @@ def read_csv(params):
         for key in gb.groups:
             data_view = gb.get_group(key)
             for idx, (train_index, valid_index) in enumerate(kf.split(data_view)):
-        #         print(idx)
                 if idx ==params['kfold']:
-        #         print("TRAIN:", len(train_index), "TEST:", test_index)
-        #         print(data_view.iloc[train_index,:])
                     train_list.append(data_view.iloc[train_index,:])         
                     valid_list.append(data_view.iloc[valid_index,:]) 
 
@@ -63,8 +69,8 @@ def read_csv(params):
 
     #Sampling a sub set
     if 'small_data' in params and params['small_data']:
-        df_train = df_train.sample(n=5,random_state=3)
-        df_valid = df_valid.sample(n=20,random_state=3)
+        df_train = df_train.sample(n=10,random_state=3)
+        df_valid = df_valid.sample(n=5,random_state=3)
 
 
     if 'aug_folders' in params and params['aug_folders'] is not None:
@@ -91,18 +97,18 @@ def create_data(params, df_train, df_valid):
     ### Read the training data and validation data ###
     print("Read training data ....")
     train_data = data_input.plumage_data_input(df_train,batch_size=params['batch_size'],is_train =params['is_train'],
-                               pre_path =params['img_folder'],state=params['data_state'],
-                               scale=params['scale'] ,is_aug = False,
-                               heatmap_scale = params['output_stride'] ,
-                               view = params['category'],no_standard = _help_func_dict(params,"no_standard",False) ,
-                               coords_cols_override = _help_func_dict(params,"cols_override",None))
+                                pre_path =params['img_folder'],state=params['data_state'],file_col = params['file_col'],
+                                scale=params['scale'] , heatmap_scale = params['output_stride'] ,
+                                view = params['category'],no_standard = _help_func_dict(params,"no_standard",False) ,
+                                coords_cols_override = _help_func_dict(params,"cols_override",None),
+                                default_coords_cols = _help_func_dict(params,"default_coords_cols",False))
     print("Read valid data ....\n")
     valid_data = data_input.plumage_data_input(df_valid,batch_size=params['batch_size'],is_train =params['is_train'],
-                               pre_path =params['img_folder'],state=params['data_state'],
-                               scale=params['scale'] ,is_aug = False,
-                               heatmap_scale = params['output_stride'],
+                                pre_path =params['img_folder'],state=params['data_state'], file_col = params['file_col'],
+                                scale=params['scale'], heatmap_scale = params['output_stride'],
                                 view = params['category'],no_standard = _help_func_dict(params,"no_standard",False),
-                                coords_cols_override = _help_func_dict(params,"cols_override",None) )
+                                coords_cols_override = _help_func_dict(params,"cols_override",None), 
+                                default_coords_cols = _help_func_dict(params,"default_coords_cols",False))
     params['points_num'] = train_data.lm_cnt
     params['point_names'] = train_data.points_names
     extract_config_name(params)
@@ -133,9 +139,9 @@ def trainining(params, train_data, valid_data):
 
     #File name and paths
     param_dir = params['saver_directory']
-    logdir = os.path.join(params['log_dir'], str(date.today()) + config_name)
+    logdir = os.path.join(params['log_dir'], config_name)
     restore_file = params['restore_param_file']
-    save_filename = "{}_{}".format(str(date.today()) ,params['name']) + config_name
+    save_filename = config_name
     initialize = params['init']
 
     saver = tf.train.Saver()
@@ -271,14 +277,14 @@ def get_and_eval_result(params, valid_data):
 
     write_pred_dataframe(valid_data , pred_coords ,
         folder = params_valid['valid_result_dir']+"grid_temp/",
-        file_name = str(date.today()) + params_valid['config_name'],
+        file_name = params['config_name'], file_col_name = params['file_col'],
         patches_coord=None, write_index = False )
 
     result_dict = build_result_dict(result_dict = params_valid,
         pck = np.round(pck, 4), mean_pck = round(np.nanmean(pck), 4), pck_threshold = params_valid['pck_threshold'],
         diff_per_pt=np.round(diff_per_pt, 4), mean_diff_per_pt = round(np.nanmean(diff_per_pt), 4),
         pck_50 = pck_50, pck_150 = pck_150 , pck_200 = pck_200 , pck_300 = pck_300)
-    result_dict['result_names'] = str(date.today()) + params['config_name'] +".csv"
+    result_dict['result_names'] = params['config_name'] +".csv"
 
     return result_dict, pred_coords
 
@@ -288,8 +294,8 @@ args = sys.argv
 if len(args)==2:
     config_name = args[1]
 else:
-    config_name = 'config_train_cpm.cfg'
-print('--Parsing Config File: {}'.format(config_name))
+    config_name = 'config_train_hg.cfg'
+
 
 params = process_config(os.path.join(dirname, config_name))
 grid_params = generate_grid_params(params)
