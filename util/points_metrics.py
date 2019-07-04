@@ -13,7 +13,6 @@ def pck_accuracy(pred_coords, gt_coords , lm_cnt , pck_threshold, scale = 1 ):
         lm_cnt: the landmark count
         pck_threshold: The pck threshold
         scale: scale on coords.
-
     return:
         pixel difference per key point 
         pck with threshold
@@ -39,12 +38,10 @@ def pck_accuracy(pred_coords, gt_coords , lm_cnt , pck_threshold, scale = 1 ):
 def in_area_rate(pred_coords ,gt_coords, masks):
     """
     Goals: check whether the giving points
-
     params:
         pred_coords: prediction points [batch , landmark *2 ]. eg [x1,y1, ... , xn, yn]
         gt_coords: ground truth points [batch , landmark *2 ]. eg [x1,y1, ... , xn, yn]
         masks: The area that for check whether the poins are inside (batch, height, width, n).
-
     """
 
 
@@ -164,8 +161,15 @@ def pixel_difference_single(gt_coords , pred_coords,length, proportion, files_na
         for idx, pat in enumerate(pred_patches):
             if pat !=-1:
                 rect_coords = eval('[' + pat +']')
-                x = np.arange(rect_coords[0],rect_coords[1]).astype(int)
-                y = np.arange(rect_coords[2],rect_coords[3]).astype(int)
+                x_min = max(0,rect_coords[0])
+                x_max = min(img.shape[1]-1, rect_coords[1])
+
+                y_min = max(0,rect_coords[2])
+                y_max = min(img.shape[0]-1, rect_coords[3])
+
+                x = np.arange(x_min, x_max, dtype = int)
+                y = np.arange(y_min, y_max, dtype = int)
+
                 pixels = img[np.repeat(y,len(x)) , np.tile(x, len(y)),:]
 
                 mean_pixel = list(np.round(np.nanmean(pixels,axis = 0)))
@@ -175,8 +179,15 @@ def pixel_difference_single(gt_coords , pred_coords,length, proportion, files_na
         for idx, pat in enumerate(gt_patches):
             if pat !=-1:
                 rect_coords = eval('[' + pat +']')
-                x = np.arange(rect_coords[0],rect_coords[1]).astype(int)
-                y = np.arange(rect_coords[2],rect_coords[3]).astype(int)
+                x_min = max(0,rect_coords[0])
+                x_max = min(img.shape[1]-1, rect_coords[1])
+
+                y_min = max(0,rect_coords[2])
+                y_max = min(img.shape[0]-1, rect_coords[3])
+
+                x = np.arange(x_min, x_max, dtype = int)
+                y = np.arange(y_min, y_max, dtype = int)
+
                 pixels = img[np.repeat(y,len(x)) , np.tile(x, len(y)),:]
 
                 mean_pixel = list(np.round(np.nanmean(pixels,axis = 0)))
@@ -232,8 +243,14 @@ def pixel_difference_single_length(gt_coords , pred_coords,length, files_names ,
         for idx, pat in enumerate(pred_patches):
             if pat !=-1:
                 rect_coords = eval('[' + pat +']')
-                x = np.arange(rect_coords[0],rect_coords[1])
-                y = np.arange(rect_coords[2],rect_coords[3])
+                x_min = max(0,rect_coords[0])
+                x_max = min(img.shape[1], rect_coords[1])
+
+                y_min = max(0,rect_coords[2])
+                y_max = min(img.shape[0], rect_coords[3])
+
+                x = np.arange(x_min, x_max)
+                y = np.arange(y_min, y_max)
                 pixels = img[np.repeat(y,len(x)) , np.tile(x, len(y)),:]
 
                 mean_pixel = list(np.round(np.nanmean(pixels,axis = 0)))
@@ -242,9 +259,14 @@ def pixel_difference_single_length(gt_coords , pred_coords,length, files_names ,
         gt_patches = all_gt_patches[batch_idx]
         for idx, pat in enumerate(gt_patches):
             if pat !=-1:
-                rect_coords = eval('[' + pat +']')
-                x = np.arange(rect_coords[0],rect_coords[1])
-                y = np.arange(rect_coords[2],rect_coords[3])
+                x_min = max(0,rect_coords[0])
+                x_max = min(img.shape[1], rect_coords[1])
+
+                y_min = max(0,rect_coords[2])
+                y_max = min(img.shape[0], rect_coords[3])
+
+                x = np.arange(x_min, x_max)
+                y = np.arange(y_min, y_max)
                 pixels = img[np.repeat(y,len(x)) , np.tile(x, len(y)),:]
 
                 mean_pixel = list(np.round(np.nanmean(pixels,axis = 0)))
@@ -266,4 +288,3 @@ def pixel_difference_single_length(gt_coords , pred_coords,length, files_names ,
         final_result[str(length)]['gt_pixel_patches'] = gt_pixel_per_patch
         final_result[str(length)]['pred_pixel_patches'] = pixel_per_patch
     return final_result
-

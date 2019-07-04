@@ -4,13 +4,11 @@ import cv2
 def heatmap_to_coord(heatmaps , ori_width , ori_height):
     """
     # Goals: transfer heatmaps to the size given
-
     Params:
         heatmaps: heatmaps from pose esitmation method, 
             Shape(df_size, heatmap_height,heatmap_width, heatmap channel)
         ori_width: The width you want to transfer back
         ori_height: The height you want to transfer back
-
     return:
         The coordinates found on heatmap, eg [x1,y1,x2,y2,...,xn,yn]
         Shape: (df_size,cnt_size*2)
@@ -66,10 +64,8 @@ def pred_coords_to_patches(pred_coords , width =10,height=10 , ignore_coords =10
 def create_rect_on_coords_fixed_length(coords , width =10, height=10 , circular_indexing = False):
     """
     Goal: a N_D array of rectangle using coords as center 
-
     params:
         coords: [batch, x1,y1,..., xn,yn]
-
     return:
         x,y strings in [batch, n_patches]
     """
@@ -112,16 +108,13 @@ def create_rect_on_coords_proportion_length(coords , width =20, height=20 , prop
     """
     Goal: a N_D array of rectangle using coords as center
         Using the proportion of distance between body region as rectangle length
-
     params:
         coords: [batch, x1,y1,..., xn,yn]
-
     return:
         x,y strings in [batch, n_patches]
     """
 
     # coords = coords[:,ignore_coords:]
-
     total_patches = coords.shape[-1]//2
     coords = coords.copy()
     coords[coords==-1] = np.nan
@@ -143,8 +136,12 @@ def create_rect_on_coords_proportion_length(coords , width =20, height=20 , prop
         for j in range(total_patches):
             if j > ignore_coords and j < total_patches-1:
                 
-                left_body_part_dist = x_coords[i,j] - x_coords[i,j-1]
-                right_body_part_dist = x_coords[i,j+1] - x_coords[i,j]
+                pt_current = np.array((x_coords[i,j] , y_coords[i,j]))
+                pt_prev = np.array((x_coords[i,j-1] , y_coords[i,j-1]))
+                pt_next = np.array((x_coords[i,j+1] , y_coords[i,j+1]))
+
+                left_body_part_dist = np.linalg.norm(pt_current-pt_prev)
+                right_body_part_dist = np.linalg.norm(pt_current-pt_next)
                 
                 if not np.isnan(right_body_part_dist) and ((right_body_part_dist * proportion) //2)>1:
                     u_x = x_coords[i,j] + (right_body_part_dist * proportion) //2
@@ -157,7 +154,10 @@ def create_rect_on_coords_proportion_length(coords , width =20, height=20 , prop
                     l_x = x_coords[i,j] -half_width
                     
             elif j == ignore_coords:
-                right_body_part_dist = x_coords[i,j+1] - x_coords[i,j]
+                pt_current = np.array((x_coords[i,j] , y_coords[i,j]))
+                pt_next = np.array((x_coords[i,j+1] , y_coords[i,j+1]))
+
+                right_body_part_dist = np.linalg.norm(pt_current-pt_next)
                 if not np.isnan(right_body_part_dist) and ((right_body_part_dist * proportion) //2)>1:
                     u_x = x_coords[i,j] + (right_body_part_dist * proportion) //2
                     l_x = x_coords[i,j] - (right_body_part_dist * proportion) //2
@@ -166,7 +166,9 @@ def create_rect_on_coords_proportion_length(coords , width =20, height=20 , prop
                     l_x = x_coords[i,j] -half_width
                     
             elif j == total_patches-1:
-                left_body_part_dist = x_coords[i,j] - x_coords[i,j-1]
+                pt_current = np.array((x_coords[i,j] , y_coords[i,j]))
+                pt_prev = np.array((x_coords[i,j-1] , y_coords[i,j-1]))
+                left_body_part_dist = np.linalg.norm(pt_current-pt_prev)
                 if not np.isnan(left_body_part_dist) and ((left_body_part_dist * proportion) //2)>1:
                     u_x = x_coords[i,j] + (left_body_part_dist * proportion) //2
                     l_x = x_coords[i,j] - (left_body_part_dist * proportion) //2
