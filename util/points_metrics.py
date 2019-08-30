@@ -215,6 +215,176 @@ def pixel_difference_single(gt_coords , pred_coords,length, proportion, files_na
     final_result[result_key]['file_name'] = names_list
     return final_result
 
+def pixel_evaluation_single(gt_coords , pred_coords,length, proportion, files_names , img_folder , height=None ):
+    """
+    Goal, evaluate pixels in average r,g,b
+    average proportion
+    lightness
+    """
+    if height is None:
+        height = length
+
+    result_key = "Width:{}_Height:{}_Proportion:{}".format(length , height , proportion)
+
+    if proportion is None:
+        all_gt_patches = create_rect_on_coords_fixed_length(gt_coords, length,height)
+        all_pred_patches = create_rect_on_coords_fixed_length(pred_coords,length,height)
+    else:
+        all_gt_patches = create_rect_on_coords_proportion_length(gt_coords , width =length, height=height , proportion = proportion)
+        all_pred_patches = create_rect_on_coords_proportion_length(pred_coords , width =length, height=height , proportion = proportion)
+
+    pixel_per_patch = [[]] * all_pred_patches.shape[-1]
+    gt_pixel_per_patch = [[]] * all_pred_patches.shape[-1]
+
+    gt_hue_per_patch = [[]] * all_pred_patches.shape[-1]
+    pred_hue_per_patch = [[]] * all_pred_patches.shape[-1]
+
+    gt_lightness_per_patch = [[]] * all_pred_patches.shape[-1]
+    pred_lightness_per_patch = [[]] * all_pred_patches.shape[-1]
+
+
+    names_list = {}
+    
+    final_result = collections.defaultdict(dict)
+
+    for batch_idx in range(gt_coords.shape[0]):
+        filename = img_folder + files_names[batch_idx]
+        names_list[files_names[batch_idx]] = {}
+
+        img = cv2.imread(filename)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    #     img = cv2.resize(img, dsize=(width,height), interpolation=cv2.INTER_CUBIC)
+        
+        # get the right patches for the image.
+        pred_patches = all_pred_patches[batch_idx]
+        names_list[files_names[batch_idx]]['pred'] = {}
+        for idx, pat in enumerate(pred_patches):
+            if pat !=-1:
+                rect_coords = eval('[' + pat +']')
+                x_min = max(0,rect_coords[0])
+                x_max = min(img.shape[1]-1, rect_coords[1])
+
+                y_min = max(0,rect_coords[2])
+                y_max = min(img.shape[0]-1, rect_coords[3])
+
+                x = np.arange(x_min, x_max, dtype = int)
+                y = np.arange(y_min, y_max, dtype = int)
+
+                pixels = img[np.repeat(y,len(x)) , np.tile(x, len(y)),:]
+
+                mean_pixel = list(np.round(np.nanmean(pixels,axis = 0)))
+                names_list[files_names[batch_idx]]['pred'][idx] = mean_pixel
+
+                pixel_per_patch[idx] = pixel_per_patch[idx] + (mean_pixel)
+
+                pred_hue_per_patch[idx] = pred_hue_per_patch[idx] + rgb_to_hue_proportion(mean_pixel)
+
+                pred_lightness_per_patch[idx] = pred_lightness_per_patch[idx] + [rgb_to_lightness(mean_pixel)]
+        
+        
+
+        gt_patches = all_gt_patches[batch_idx]
+        names_list[files_names[batch_idx]]['gt'] = {}
+        for idx, pat in enumerate(gt_patches):
+            if pat !=-1:
+                rect_coords = eval('[' + pat +']')
+                x_min = max(0,rect_coords[0])
+                x_max = min(img.shape[1]-1, rect_coords[1])
+
+                y_min = max(0,rect_coords[2])
+                y_max = min(img.shape[0]-1, rect_coords[3])
+
+                x = np.arange(x_min, x_max, dtype = int)
+                y = np.arange(y_min, y_max, dtype = int)
+
+                pixels = img[np.repeat(y,len(x)) , np.tile(x, len(y)),:]
+
+                mean_pixel = list(np.round(np.nanmean(pixels,axis = 0)))
+                names_list[files_names[batch_idx]]['gt'][idx] = mean_pixel
+
+                gt_pixel_per_patch[idx] = gt_pixel_per_patch[idx] + (mean_pixel)
+
+                gt_hue_per_patch[idx] = gt_hue_per_patch[idx] + rgb_to_hue_proportion(mean_pixel)
+
+                gt_lightness_per_patch[idx] = gt_lightness_per_patch[idx] + [rgb_to_lightness(mean_pixel)]
+        
+    
+    difference = np.array([])
+    coeff_list = np.array([])
+    p_value_list = np.array([])
+
+    hue_difference = np.array([])
+    hue_coeff_list = np.array([])
+    hue_p_value_list = np.array([])
+
+    lightness_difference = np.array([])
+    lightness_coeff_list = np.array([])
+    lightness_p_value_list = np.array([])
+
+
+
+    for gt,pred in zip(gt_pixel_per_patch, pixel_per_patch):
+
+        coeff, p_value = pearsonr(gt,pred)
+        coeff_list = np.append(coeff_list, coeff)
+        p_value_list = np.append(p_value_list , p_value)
+
+        diff = [np.linalg.norm(np.subtract(gt[id_start:id_start+3],pred[id_start:id_start+3])) for id_start in np.arange(0,len(gt) , 3)]
+        diff = np.mean(diff)
+
+        difference = np.append(difference, diff)
+
+    for gt,pred in zip(gt_hue_per_patch, pred_hue_per_patch):
+
+        coeff, p_value = pearsonr(gt,pred)
+        hue_coeff_list = np.append(hue_coeff_list, coeff)
+        hue_p_value_list = np.append(hue_p_value_list , p_value)
+
+        diff = [np.linalg.norm(np.subtract(gt[id_start:id_start+3],pred[id_start:id_start+3])) for id_start in np.arange(0,len(gt) , 3)]
+        diff = np.mean(diff)
+
+        hue_difference = np.append(hue_difference, diff)
+
+    for gt,pred in zip(gt_lightness_per_patch, pred_lightness_per_patch):
+        result = np.absolute(np.subtract(gt, pred))
+#             print("pixel difference: ", np.mean(result))
+        coeff, p_value = pearsonr(gt,pred)
+        lightness_coeff_list = np.append(lightness_coeff_list, coeff)
+        lightness_p_value_list = np.append(lightness_p_value_list , p_value)
+        lightness_difference = np.append(lightness_difference, np.nanmean(result))
+
+    final_result[result_key]['rgb_diff'] = difference
+    final_result[result_key]['rgb_coeff'] = coeff_list
+    final_result[result_key]['rgb_p_value'] = p_value_list
+
+    final_result[result_key]['hue_diff'] = hue_difference
+    final_result[result_key]['hue_coeff'] = hue_coeff_list
+    final_result[result_key]['hue_p_value'] = hue_p_value_list
+
+    final_result[result_key]['lightness_diff'] = lightness_difference
+    final_result[result_key]['lightness_coeff'] = lightness_coeff_list
+    final_result[result_key]['lightness_p_value'] = lightness_p_value_list
+
+
+    final_result[result_key]['rgb_gt_patches'] = gt_pixel_per_patch
+    final_result[result_key]['rgb_pred_patches'] = pixel_per_patch
+
+    final_result[result_key]['hue_gt_patches'] = gt_hue_per_patch
+    final_result[result_key]['hue_pred_patches'] = pred_hue_per_patch
+
+    final_result[result_key]['lightness_gt_patches'] = gt_lightness_per_patch
+    final_result[result_key]['lightness_pred_patches'] = pred_lightness_per_patch
+    final_result[result_key]['file_name'] = names_list
+    return final_result
+
+def rgb_to_hue_proportion(value):
+    return list(np.array(value) / np.sum(value))
+
+def rgb_to_lightness(value):
+    return (np.amax(value)/255 + np.amin(value)/255)/2 *100
+    
+
+
 
 
 
