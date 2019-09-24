@@ -140,7 +140,8 @@ class plumage_data_input:
         scale=1 ,is_aug = False , heatmap_scale = 4,cols_num_per_coord =2,
          view = 'all', no_standard = False , train_ids = None,
           coords_cols_override = None , default_coords_cols = False , 
-          contour_col_override = None):
+          contour_col_override = None, peak_size_list = None,
+          peak_size_proportion = None, sigma_list =None):
         """
         init function for the data
         
@@ -162,29 +163,28 @@ class plumage_data_input:
         self.is_train = is_train
         self.is_aug = is_aug
         self.file_name_col = file_col
-        #
-        # if self.is_aug:
-        #     # make data frame:
-        #     df2 = self.df.copy()
-        #     self.df.loc[:,'aug'] =False
-        #     df2.loc[:,'aug'] = True
-        #     self.df = pd.concat([self.df, df2]).reset_index(drop=True)
+
+        self.peak_size_list = peak_size_list
+        self.peak_size_proportion = peak_size_proportion
+        self.sigma_list = sigma_list
+
 
         self.df_size = self.df.shape[0]
         
         self.all_columns = df.columns
 
+        assert coords_cols_override is not None
+
         if coords_cols_override is not None:
             self.coords_cols = coords_cols_override
-        elif default_coords_cols:
-            self.coords_cols = np.setdiff1d(df.columns, self.file_name_col)
+
+        # elif default_coords_cols:
+        #     self.coords_cols = np.setdiff1d(df.columns, self.file_name_col)
         else:
             self.coords_cols = return_coords_cols(view = view , no_standard = no_standard, train_ids = train_ids)
         
-        if contour_col_override is not None:
-            self.contour_col = contour_col_override
 
-
+        print(self.coords_cols)
         self.cols_num_per_coord = cols_num_per_coord
         self.lm_cnt = int(len(self.coords_cols) /  self.cols_num_per_coord)
         self.points_names = [name[:-2] for name in self.coords_cols[0::self.cols_num_per_coord]]
@@ -705,11 +705,14 @@ class plumage_data_input:
         #vis_1 ... vis_n
 
 
-    def get_y_map(self ,df):
+    def get_y_map(self,df):
         """
         Goal: return a series of heatmaps for each key points
         shape:  [batchsize, heatmap_height, heatmap_width, landmark count]
         """
+
+        peak_size_list = self.peak_size_list
+
         l_m_columns = self.coords_cols
         cols_num_per_coord = self.cols_num_per_coord
 
@@ -727,25 +730,92 @@ class plumage_data_input:
 
         pad = int(scaled_width/2)
         pad_half = int(pad/2)
-
-        
+      
         y_map = np.zeros((df_size,scaled_height,scaled_width,lm_cnt))
 
-        for j in range(df_size):
-            for i in range(lm_cnt):
-                x = y_coord[j,i*cols_num_per_coord]
-                y = y_coord[j,i*cols_num_per_coord+1]
-                if x!=-1 and y!=-1:
-                    scale_x = int((x-1)/real_scale)
-                    scale_y = int((y-1)/real_scale)
+        if peak_size_list is None:
+            # All peaks have the same radius
+            for j in range(df_size):
+                for i in range(lm_cnt):
+                    x = y_coord[j,i*cols_num_per_coord]
+                    y = y_coord[j,i*cols_num_per_coord+1]
+                    if x!=-1 and y!=-1:
+                        scale_x = int((x-1)/real_scale)
+                        scale_y = int((y-1)/real_scale)
 
-                    y_map_pad = np.zeros((scaled_height+pad,  scaled_width+pad))
-                    y_map_pad[scale_y + pad_half,  scale_x+pad_half] = 200
-                    y_map_pad = gaussian_filter(y_map_pad,sigma=2)
-                    y_map[j,:,:,i] = y_map_pad[pad_half:scaled_height+pad_half, pad_half:scaled_width+pad_half]
-                    # y_map[j,y,x,i]=1
+                        y_map_pad = np.zeros((scaled_height+pad,  scaled_width+pad))
+                        y_map_pad[scale_y + pad_half,  scale_x+pad_half] = 1000
+                        if self.sigma_list is None:
+                            y_map_pad = gaussian_filter(y_map_pad,sigma=2)
+                        else:
+                            y_map_pad = gaussian_filter(y_map_pad,sigma=self.sigma_list[i])
+                        y_map[j,:,:,i] = y_map_pad[pad_half:scaled_height+pad_half, pad_half:scaled_width+pad_half]
+                        # y_map[j,y,x,i]=1
+        else:
+            # Create heatmaps by rules
+            for j in range(df_size):
+                view = df.view.values[j]
+                x_s = y_coord[j,::2]
+                x_s = x_s[x_s!=-1]
+                x_distance = np.amax(x_s) - np.amin(x_s)
+                # print(view, x_distance)
+
+                width_candidate = int(x_distance * self.peak_size_proportion[view])
+                for i in range(lm_cnt):
+                    x = y_coord[j,i*cols_num_per_coord]
+                    y = y_coord[j,i*cols_num_per_coord+1]
+                    if i < 5 or x_distance == 0:
+                        width = peak_size_list[i][0]
+                    else:
+                        width = width_candidate
+
+                    # width = peak_size_list[i][0]
+                    height =  peak_size_list[i][1]
+
+                    if x!=-1 and y!=-1:
+                        # Create gaussian peak
+                        # print(i, width, height)
+                        y_map_origin = self.create_gaussian_map(self.img_width, self.img_height, x, y, 100,1)
+
+                        peak = y_map_origin[y-4:y+5,x-4:x+5]
+
+                        width_scale = width//10
+                        height_scale = height//10
+                        peak_scaled = cv2.resize(peak,
+                            (peak.shape[0] * width_scale, peak.shape[1]  * height_scale))
+
+                        peak_scaled_padded = cv2.copyMakeBorder(peak_scaled,5000,5000,5000,5000,cv2.BORDER_CONSTANT,value=0)
+
+                        peak_scaled_up = peak_scaled.shape[0]//2
+                        peak_scaled_left = peak_scaled.shape[1]//2
+
+                        peak_scaled_padded = peak_scaled_padded[5000+peak_scaled_up-y:5000+peak_scaled_up-y +self.img_height,
+                        5000+peak_scaled_left-x: 5000+peak_scaled_left-x + self.img_width]
+
+                        # y_start = y * height_scale -y
+                        # x_start = x * width_scale  -x
+                        # y_map_scaled = y_map_scaled[y_start:y_start + self.img_height, x_start : x_start+ self.img_width]
+
+                        # print(peak_scaled_padded.shape)
+                        # print((scaled_width, scaled_height))
+
+                        y_map_scaled = cv2.resize(peak_scaled_padded,(scaled_width,scaled_height))
+                        y_map[j,:,:,i] = y_map_scaled
+                        # y_map[j,y,x,i]=1
+
         y_map = np.round(y_map,8)
         return y_map
+
+    def create_gaussian_map(self,width, height , x, y, mean, sigma):
+        pad =    width//2
+        pad_half =  pad//2
+        y_map = np.zeros((height+pad,  width+pad))
+
+        y_map[y + pad_half,  x + pad_half] = mean
+        y_map = gaussian_filter(y_map, sigma=sigma)
+
+        return y_map[pad_half:height+pad_half, pad_half:width+pad_half]
+
 
     def get_y_vis_map(self ,df):
         """
