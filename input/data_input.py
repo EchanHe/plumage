@@ -173,7 +173,7 @@ class plumage_data_input:
         
         self.all_columns = df.columns
 
-        assert coords_cols_override is not None
+        # assert coords_cols_override is not None
 
         if coords_cols_override is not None:
             self.coords_cols = coords_cols_override
