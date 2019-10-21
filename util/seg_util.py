@@ -18,7 +18,7 @@ def mask_to_contour(mask , scale , ignore_mask_channel):
     channel_list = []
     for channel in range(0,mask.shape[-1]):
         if channel not in ignore_mask_channel:
-            _, contours, hierarchy = cv2.findContours(mask[...,channel].astype("uint8"),cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+            contours, hierarchy = cv2.findContours(mask[...,channel].astype("uint8"),cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
             contours_list = []
             if len(contours)>0:
                 for cons in contours:
