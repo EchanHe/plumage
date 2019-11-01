@@ -20,9 +20,19 @@ def heatmap_to_coord(heatmaps , ori_width , ori_height):
         for j in range(cnt_size):
             heat_map = heatmaps[i,:,:,j]
             ori_heatmap = cv2.resize(heat_map, dsize=(ori_width, ori_height),interpolation = cv2.INTER_NEAREST)
-            map_shape = np.unravel_index(np.argmax(ori_heatmap, axis=None), ori_heatmap.shape)
-            output_result[i,j*2+0] = map_shape[1] + 1
-            output_result[i,j*2+1] = map_shape[0] + 1
+
+            # map_shape = np.unravel_index(np.argmax(ori_heatmap, axis=None), ori_heatmap.shape)
+            # output_result[i,j*2+0] = map_shape[1] + 1
+            # output_result[i,j*2+1] = map_shape[0] + 1
+
+
+            y_x_coords = np.where(ori_heatmap == np.max(ori_heatmap))
+            x = int(round(np.mean(y_x_coords[1]+1)))
+            y = int(round(np.mean(y_x_coords[0]+1)))
+
+            output_result[i,j*2+0] = x 
+            output_result[i,j*2+1] = y
+
     return output_result
 
 # Goals: transfer the coords into a rectangle coords
