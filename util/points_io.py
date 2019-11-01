@@ -74,6 +74,59 @@ def build_result_dict(result_dict= {},name = None,
     result_dict = {str(k):str(v) for k,v in result_dict.items()}
     return result_dict
 
+### Heatmap functions:
+def plot_heatmaps(dir, heatmaps, img, file_name,  names = None, img_per_row = 5):
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+
+    results = np.array([], dtype=np.int64).reshape(0, img.shape[1] * img_per_row,3)
+    row = np.array([], dtype=np.int64).reshape(img.shape[0],0,3)
+
+    for i in range(heatmaps.shape[-1]):
+        # Fore every pic
+
+        heatmap = heatmaps[...,i:i+1]
+        # print(np.min(img_temp),np.max(img_temp))
+        heatmap = np.interp(heatmap,[np.min(heatmap),np.max(heatmap)],[0,255]).astype(np.uint8)
+        heatmap = cv2.applyColorMap(heatmap,cv2.COLORMAP_JET)
+
+        heatmap = cv2.resize(heatmap, dsize=(img.shape[1], img.shape[0]),
+            interpolation = cv2.INTER_NEAREST)
+
+        dst = cv2.addWeighted(img,0.5,heatmap,0.5,0)
+        if names is not None:
+            cv2.putText(dst, names[i], (50,50),
+             cv2.FONT_HERSHEY_SIMPLEX, 1, (200, 200, 200), 2, cv2.LINE_AA)
+
+        if (i+1) % img_per_row !=0:
+            row = np.hstack((row, dst))
+        else:
+            row = np.hstack((row, dst))
+            results = np.vstack((results, row))
+            row = np.array([], dtype=np.int64).reshape(img.shape[0],0,3)
+    if heatmaps.shape[-1] % img_per_row !=0:      
+        offset = (img_per_row-heatmaps.shape[-1] % img_per_row)
+        blank = np.zeros((img.shape[0] , img.shape[1] * offset  , 3)).astype(np.uint8)
+
+        row = np.hstack((row , blank))
+        results = np.vstack((results, row))
+          
+    cv2.imwrite( os.path.join(dir, "{}.png".format(file_name)),results)
+
+
+
+def save_heatmaps(dir, heatmaps, file_name,  pt_names):
+    dir = os.path.join(dir, file_name)
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+
+    for i in range(heatmaps.shape[-1]):
+        # Fore every pic
+        heatmap = heatmaps[...,i:i+1]
+        heatmap = np.interp(heatmap,[np.min(heatmap),np.max(heatmap)],[0,255]).astype(np.uint8)
+        cv2.imwrite( os.path.join(dir, "{}.jpg".format(pt_names[i])),heatmap)
+
+
 ### Deprecate  ####
 
 def write_point_result(pred_coord , gt_coords,lm_cnt, params, folder):

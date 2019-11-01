@@ -13,6 +13,8 @@ import sys, os
 import network
 from datetime import date
 
+from sklearn.model_selection import train_test_split, KFold
+
 dirname = os.path.dirname(__file__)
 input_lib_dir= os.path.abspath(os.path.join(dirname,"../input"))
 util_lib_dir= os.path.abspath(os.path.join(dirname,"../util"))
@@ -22,7 +24,10 @@ import data_input
 from plumage_config import process_config, generate_grid_params
 from points_util import heatmap_to_coord
 from points_metrics import *
-from points_io import write_pred_dataframe
+from points_io import write_pred_dataframe,plot_heatmaps,save_heatmaps
+
+
+
 
 print('--Parsing Config File')
 config_name = 'config_pred_cpm.cfg'
@@ -30,11 +35,51 @@ config_name = 'config_pred_cpm.cfg'
 params = process_config(os.path.join(dirname, config_name))
 
 ##reading data###
-df_pred = pd.read_csv(params['pred_file'])
 
+
+if 'split' not in params or params['split'] == False:
+    df_pred = pd.read_csv(params['pred_file'])
+else:
+    df_all = pd.read_csv(params['pred_file'])
+    
+    # Split training and valdiation data, via category.
+    if 'category_col' in params and params['category_col'] is not None:
+        category_col = params['category_col']
+    else:
+        category_col = "view"
+
+    if category_col not in df_all.columns:
+        df_all[category_col] = 1
+
+    gb = df_all.groupby("view")
+    if params['kfold'] ==None:
+        print("train_test_split with seed:",params['split_seed'] )
+        # train_test_split split option
+        split_list = [t for x in gb.groups for t in train_test_split(gb.get_group(x),
+         test_size=params['test_size'], random_state =params['split_seed'])]
+        
+        df_train = pd.concat(split_list[0::2],sort = False)
+        df_valid = pd.concat(split_list[1::2],sort = False)
+    else:
+        # Kfold option
+        print("Kfold with seed: {} and {} th fold".format(params['split_seed'] ,params['kfold'] ))
+        kf = KFold(n_splits=5 ,shuffle = True, random_state=params['split_seed'])
+        train_list = []
+        valid_list = []
+        for key in gb.groups:
+            data_view = gb.get_group(key)
+            for idx, (train_index, valid_index) in enumerate(kf.split(data_view)):
+                if idx ==params['kfold']:
+                    train_list.append(data_view.iloc[train_index,:])         
+                    valid_list.append(data_view.iloc[valid_index,:]) 
+
+        df_train = pd.concat(train_list,sort = False)
+        df_valid = pd.concat(valid_list,sort = False)    
+    
+    df_pred = df_valid
 #df_pred = df_pred.sample(n=50,random_state=3)
 # Create the name using some of the configuratation.
-print(params['category'])
+
 if params['category'] is not None and params['category'] !='all':
     params['name'] +='_' + params['category']
     df_train = df_train.loc[df_train.view==params["category"],:].reset_index(drop = True)
@@ -89,28 +134,28 @@ with tf.Session() as sess:
 
     for start_id in range(0, pred_data.df.shape[0], pred_data.batch_size):
         #Generate heatmaps by batchs, so the memory won't overflow.
+        # img_mini , heatmap_mini,_ , _ = pred_data.get_next_batch_no_random()
         img_mini = pred_data.get_next_batch_no_random()
+        
         feed_dict = {model.images: img_mini}
         predict_mini = sess.run(predict, feed_dict=feed_dict)
 
+        if 'summary_heatmaps' in params and params['summary_heatmaps']:
+            plot_heatmaps(dir = params['heatmap_dir'],
+             heatmaps = predict_mini[0,...], img = img_mini[0,...],
+              file_name = pred_names[start_id],  names = pred_data.points_names, img_per_row = 5)
+
+            # plot_heatmaps(dir = "/home/yichenhe/plumage/result/heatmap_test/heatmap_per_point/gt_sigma2/",
+            #  heatmaps = heatmap_mini[0,...], img = img_mini[0,...],
+            #   file_name = pred_names[start_id],  names = pred_data.points_names, img_per_row = 5)
 
         if 'save_heatmaps' in params and params['save_heatmaps']:
-            # Save images.
-            if not os.path.exists(params['heatmap_dir']):
-                os.makedirs(params['heatmap_dir'])
-            for i in range(params['points_num']):
-                img_temp = predict_mini[0,...,i:i+1]
-                img_temp = np.interp(img_temp,[np.min(img_temp),np.max(img_temp)],[0,255]).astype(np.uint8)
-                img_temp = cv2.applyColorMap(img_temp, cv2.COLORMAP_JET)
+            save_heatmaps(dir = params['heatmap_dir'], heatmaps= predict_mini[0,...], 
+                file_name = pred_names[start_id],  pt_names =  pred_data.points_names)
 
-                img_temp = cv2.resize(img_temp, dsize=(img_mini.shape[2], img_mini.shape[1]),
-                    interpolation = cv2.INTER_NEAREST)
-
-                dst = cv2.addWeighted(img_mini[0,...],0.3,img_temp,0.7,0)
-
-                cv2.imwrite(params['heatmap_dir'] + "{}_{}.png".format(pred_names[start_id],pred_data.points_names[i]),
-                            dst)
-
+            # save_heatmaps(dir = "/home/yichenhe/plumage/result/heatmap_test/heatmap_per_point/gt_sigma2/",
+            #  heatmaps= heatmap_mini[0,...], 
+            #     file_name = pred_names[start_id],  pt_names =  pred_data.points_names)
 
         pred_coord_mini = heatmap_to_coord(predict_mini , pred_data.img_width , pred_data.img_height)
 
