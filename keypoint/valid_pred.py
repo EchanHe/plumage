@@ -165,7 +165,7 @@ with tf.Session() as sess:
         print(start_id, "steps")
     pred_df = write_pred_dataframe(pred_data, pred_coords,
         folder = params['pred_result_dir']+"pred/",
-        file_name = str(date.today()) + params['name'], file_col_name = params['file_col'],
+        file_name = str(date.today()) + params.get("result_name", "result"), file_col_name = params['file_col'],
         patches_coord=None, write_index = False , is_valid = is_valid)
 
 # If validation, print or save the metrics between ground-truth and predictions
