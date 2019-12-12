@@ -9,6 +9,7 @@ import pandas as pd
 
 from scipy.ndimage import gaussian_filter
 import cv2
+import pickle
 
 import os, errno
 import random as rand_lib
@@ -118,6 +119,61 @@ def segm_size(segm):
 #-----helper functions of segs_to_masks----
 
 
+#-----helper functions of reading images or input data----
+def read_img(filename):
+    """
+    Read image of pickle file and return them
+
+    input:
+        filename: path and filename
+    """
+    _, ext = os.path.splitext(filename)
+    if ext == '.pickle':
+        with open(filename, "rb") as f_in:
+            result = pickle.load(f_in)
+
+    else:
+        result = cv2.imread(filename)
+        result = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+    return result
+
+def read_file(df, idx, pre_path , file_name_cols):
+    """
+    Read image of pickle file and return them
+
+    input:
+        filename: path and filename
+    """
+
+    def read_img(filename):
+        _, ext = os.path.splitext(filename)
+        if ext == '.pickle':
+            with open(filename, "rb") as f_in:
+                result = pickle.load(f_in)
+
+        else:
+            result = cv2.imread(filename)
+            result = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
+
+        return result
+
+    if isinstance(file_name_cols, list):
+        result_list = []
+        for file_col in file_name_cols:
+            filename = pre_path+df.loc[idx,file_col]
+            result_list.append(read_img(filename))
+
+        result = np.concatenate(result_list, axis=2)
+    else: 
+
+        filename = pre_path+df.loc[idx, file_name_cols]
+        result = read_img(filename)
+
+
+    return result
+
+
 # Data class
 class plumage_data_input:
     """
@@ -199,9 +255,13 @@ class plumage_data_input:
 
 
         # Print Data detail
+
+        img =read_file(df, df.index[0], pre_path, self.file_name_col)
         filepath_test = pre_path+df.loc[df.index[0],self.file_name_col]
         print(filepath_test)
-        img = cv2.imread(filepath_test)
+        # img = read_img(filepath_test)
+        self.input_channel = img.shape[2]
+        # img = cv2.imread(filepath_test)
         self.img_width= img.shape[1]
         self.img_height = img.shape[0]
 
@@ -470,14 +530,17 @@ class plumage_data_input:
         width = int(self.img_width/scale)
         height = int(self.img_height/scale)
 
-        x_all = np.zeros((size, height , width,3))
+        x_all = np.zeros((size, height , width, self.input_channel))
 
         i=0
         for idx,row in df.iterrows():
 
-            filename =folder+row[self.file_name_col]
-            img = cv2.imread(filename)
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img =read_file(df, idx, folder, self.file_name_col)
+
+            # filename =folder+row[self.file_name_col]
+            # img = read_img(filename)
+            # img = cv2.imread(filename)
+            # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             img = cv2.resize(img, dsize=(width,height), interpolation=cv2.INTER_CUBIC)
 
             x_all[i,:,:,:] = img

@@ -30,43 +30,47 @@ from seg_util import masks_to_contours , segs_to_masks
 
 
 def read_csv(params):
-    ##reading data
-    df_all = pd.read_csv(params['input_file'])
-    
-    # Split training and valdiation data, via category.
-    if 'category_col' in params and params['category_col'] is not None:
-        category_col = params['category_col']
-    else:
-        category_col = "view"
-
-    if category_col not in df_all.columns:
-        df_all[category_col] = 1
-
-    gb = df_all.groupby("view")
-    if params['kfold'] ==None:
-        print("train_test_split with seed:",params['split_seed'] )
-        # train_test_split split option
-        split_list = [t for x in gb.groups for t in train_test_split(gb.get_group(x),
-         test_size=params['test_size'], random_state =params['split_seed'])]
+    if 'input_file' in params:
+        ##reading data
+        df_all = pd.read_csv(params['input_file'])
         
-        df_train = pd.concat(split_list[0::2],sort = False)
-        df_valid = pd.concat(split_list[1::2],sort = False)
+        # Split training and valdiation data, via category.
+        if 'category_col' in params and params['category_col'] is not None:
+            category_col = params['category_col']
+        else:
+            category_col = "view"
+
+        if category_col not in df_all.columns:
+            df_all[category_col] = 1
+
+        gb = df_all.groupby("view")
+        if params['kfold'] ==None:
+            print("train_test_split with seed:",params['split_seed'] )
+            # train_test_split split option
+            split_list = [t for x in gb.groups for t in train_test_split(gb.get_group(x),
+             test_size=params['test_size'], random_state =params['split_seed'])]
+            
+            df_train = pd.concat(split_list[0::2],sort = False)
+            df_valid = pd.concat(split_list[1::2],sort = False)
+        else:
+            # Kfold option
+            print("Kfold with seed: {} and {} th fold".format(params['split_seed'] ,params['kfold'] ))
+            kf = KFold(n_splits=5 ,shuffle = True, random_state=params['split_seed'])
+            train_list = []
+            valid_list = []
+            for key in gb.groups:
+                data_view = gb.get_group(key)
+                for idx, (train_index, valid_index) in enumerate(kf.split(data_view)):
+                    if idx ==params['kfold']:
+                        train_list.append(data_view.iloc[train_index,:])         
+                        valid_list.append(data_view.iloc[valid_index,:]) 
+
+            df_train = pd.concat(train_list,sort = False)
+            df_valid = pd.concat(valid_list,sort = False)
+
     else:
-        # Kfold option
-        print("Kfold with seed: {} and {} th fold".format(params['split_seed'] ,params['kfold'] ))
-        kf = KFold(n_splits=5 ,shuffle = True, random_state=params['split_seed'])
-        train_list = []
-        valid_list = []
-        for key in gb.groups:
-            data_view = gb.get_group(key)
-            for idx, (train_index, valid_index) in enumerate(kf.split(data_view)):
-                if idx ==params['kfold']:
-                    train_list.append(data_view.iloc[train_index,:])         
-                    valid_list.append(data_view.iloc[valid_index,:]) 
-
-        df_train = pd.concat(train_list,sort = False)
-        df_valid = pd.concat(valid_list,sort = False)
-
+        df_train = pd.read_csv(params['train_file'])
+        df_valid = pd.read_csv(params['valid_file'])
     #Sampling a sub set
     if 'small_data' in params and params['small_data']:
         df_train = df_train.sample(n=10,random_state=3)
@@ -115,6 +119,7 @@ def trainining(params, train_data, valid_data):
     config_training_steps(params , train_data.df_size)
 
     tf.reset_default_graph()
+    params['input_channel'] = train_data.input_channel
     model = network.Network(params,train_data.img_width, train_data.img_height)
     predict = model.deeplab_v3()
     loss = model.loss()

@@ -21,7 +21,10 @@ class Network:
                     dtype=tf.int32, trainable=False)
         self.batch_size = config['batch_size']
 
-
+        if 'res_net_layers' in config:
+            self.res_net_layers = config['res_net_layers']
+        else:
+            self.res_net_layers = "resnet_v2_50"
 
         self.dropout_rate = config['dropout_rate']
         self.lambda_l2 = config["l2"]
@@ -53,7 +56,7 @@ class Network:
 
         self.images = tf.placeholder(
                 dtype = tf.float32,
-                shape = (self.batch_size, self.img_height, self.img_width, 3)
+                shape = (self.batch_size, self.img_height, self.img_width, config["input_channel"])
                 )
 
         self.labels = tf.placeholder(
@@ -64,10 +67,10 @@ class Network:
                 dtype = tf.float32,
                 shape = (self.batch_size, self.img_height, self.img_width, self.class_num))
 
-        self.pred_images = tf.placeholder(
-                dtype = tf.float32,
-                shape = (None, self.img_height, self.img_width, 3)
-                )
+        # self.pred_images = tf.placeholder(
+        #         dtype = tf.float32,
+        #         shape = (None, self.img_height, self.img_width, 3)
+        #         )
 
         print("Deeplab:")
 
@@ -293,30 +296,51 @@ class Network:
         """
 
         #~2000 expert project plumage images:
-        _R_MEAN = 45.48
-        _G_MEAN = 44.85
-        _B_MEAN = 44.29
+        # _R_MEAN = 45.48
+        # _G_MEAN = 44.85
+        # _B_MEAN = 44.29
+
+        # 5094 genus bird photos
+        _R_MEAN = 47.24
+        _G_MEAN = 45.71
+        _B_MEAN = 45.23
+
+        uv_1_mean = 42.13
+        uv_2_mean = 14.55
+        uv_3_mean = 15.31
 
         # mean subtraction normalization
         inputs = self.images
-        inputs = inputs - [_R_MEAN, _G_MEAN, _B_MEAN]
+        if inputs.shape[-1] ==3:
+            inputs = inputs - [_R_MEAN, _G_MEAN, _B_MEAN]
+        elif inputs.shape[-1] ==6:
+            inputs = inputs - [_R_MEAN, _G_MEAN, _B_MEAN , uv_1_mean, uv_2_mean, uv_3_mean]
 
         is_train = self.is_train
 
         # inputs has shape - Original: [batch, 513, 513, 3]
         with slim.arg_scope(resnet_utils.resnet_arg_scope(self.lambda_l2, is_train)):
-            # resnet = getattr(resnet_v2, args.resnet_model)
-            _, end_points = resnet_v2.resnet_v2_50(inputs,
-                                   self.class_num,
-                                   is_training=is_train,
-                                   global_pool=False,
-                                   spatial_squeeze=False,
-                                   output_stride=self.output_stride)
+            resnet = getattr(resnet_v2, self.res_net_layers)
+
+
+            # _, end_points = resnet_v2.resnet_v2_50(inputs,
+            #                        self.class_num,
+            #                        is_training=is_train,
+            #                        global_pool=False,
+            #                        spatial_squeeze=False,
+            #                        output_stride=self.output_stride)
+
+            _, end_points = resnet(inputs,
+                       self.class_num,
+                       is_training=is_train,
+                       global_pool=False,
+                       spatial_squeeze=False,
+                       output_stride=self.output_stride)
 
             with tf.variable_scope("DeepLab_v3"):
 
                 # get block 4 feature outputs
-                net = end_points['resnet_v2_50/block4']
+                net = end_points[self.res_net_layers +'/block4']
 
                 net = self.atrous_spatial_pyramid_pooling(net, "ASPP_layer", depth=256)
 
