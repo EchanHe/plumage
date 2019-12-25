@@ -26,6 +26,12 @@ class Network:
         else:
             self.res_net_layers = "resnet_v2_50"
 
+        if 'deeplab' in config:
+        # deep lab version, v3 or v3plus
+            self.deeplab_version = config['deeplab']
+        else:
+            self.deeplab_version = "v3"
+
         self.dropout_rate = config['dropout_rate']
         self.lambda_l2 = config["l2"]
         # self.stddev = config.stddev
@@ -268,6 +274,7 @@ class Network:
             feature_map_size = tf.shape(net)
 
             # apply global average pooling
+            # image level feature
             image_level_features = tf.reduce_mean(net, [1, 2], name='image_level_global_pool', keepdims=True)
             image_level_features = slim.conv2d(image_level_features, depth, [1, 1], scope="image_level_conv_1x1",
                                                activation_fn=None)
@@ -344,20 +351,46 @@ class Network:
 
                 net = self.atrous_spatial_pyramid_pooling(net, "ASPP_layer", depth=256)
 
-                net = slim.conv2d(net, self.class_num, [1, 1], activation_fn=None,
-                                  normalizer_fn=None, scope='logits')
-
                 size = tf.shape(inputs)[1:3]
-                size = inputs.shape[1:3]
-                # # resize the output logits to match the labels dimensions
-                # #net = tf.image.resize_nearest_neighbor(net, size)
-                net = tf.image.resize_bilinear(net, size)
-                if is_train:
-                    self.add_to_loss(net)
-                    self._fm_summary(net)
-                    self._create_summary()
-                return net
+                # size = inputs.shape[1:3]
+                if self.deeplab_version =='v3':
+                    # version 3, bilinear upsample
+                    net = slim.conv2d(net, self.class_num, [1, 1], activation_fn=None,
+                                      normalizer_fn=None, scope='logits')
 
+
+                    # # resize the output logits to match the labels dimensions
+                    # #net = tf.image.resize_nearest_neighbor(net, size)
+                    net = tf.image.resize_bilinear(net, size)
+                    if is_train:
+                        self.add_to_loss(net)
+                        self._fm_summary(net)
+                        self._create_summary()
+                    return net
+
+                elif self.deeplab_version == 'v3plus':
+                    with tf.variable_scope("decoder"):
+                        with tf.variable_scope("low_level_features"):
+                            low_level_features = end_points[self.res_net_layers + '/block1/unit_3/bottleneck_v2/conv1']
+                            low_level_features = slim.conv2d(low_level_features, 48,
+                                                                   [1, 1], stride=1, scope='conv_1x1')
+                            low_level_features_size = tf.shape(low_level_features)[1:3]
+
+                        with tf.variable_scope("upsampling_logits"):
+                            net = tf.image.resize_bilinear(net, low_level_features_size, name='upsample_1')
+                            net = tf.concat([net, low_level_features], axis=3, name='concat')
+                            net = slim.conv2d(net, 256, [3, 3], stride=1, scope='conv_3x3_1')
+                            net = slim.conv2d(net, 256, [3, 3], stride=1, scope='conv_3x3_2')
+                            net = slim.conv2d(net, self.class_num, [1, 1], activation_fn=None, 
+                                normalizer_fn=None, scope='conv_1x1')
+                            logits = tf.image.resize_bilinear(net, size, name='upsample_2')
+
+                    if is_train:
+                        self.add_to_loss(logits)
+                        self._fm_summary(logits)
+                        self._create_summary()
+
+                    return logits            
 
 # def training_network(prediction , loss , train_op, sess,config):
 def _help_func_dict(config,key, default_value = None):

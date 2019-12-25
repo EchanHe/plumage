@@ -109,7 +109,7 @@ def seg_to_mask(seg,n_cl=None):
     assert len(seg.shape) ==2 , "Make sure input is [height, width]"
 
     if n_cl is None:
-        n_cl = np.max(segseg) + 1
+        n_cl = np.max(seg) + 1
     cl, _ = extract_classes(seg)
     return extract_masks(seg , cl, n_cl)
 
