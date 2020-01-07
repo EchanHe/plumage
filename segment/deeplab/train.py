@@ -79,6 +79,7 @@ def read_csv(params):
 
     if 'aug_folders' in params and params['aug_folders'] is not None:
         if 'aug_file' in params and params['aug_file'] is not None: 
+            aug_folder = params['aug_folders']
             df_aug = pd.read_csv(params['aug_file'] , index_col = 'file.vis')
             df_aug = df_aug.loc[df_train['file.vis'],:]
             df_aug.reset_index(inplace = True)
