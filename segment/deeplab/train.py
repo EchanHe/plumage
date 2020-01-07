@@ -78,13 +78,15 @@ def read_csv(params):
 
 
     if 'aug_folders' in params and params['aug_folders'] is not None:
-        df_list = [df_train]
-        for aug_folder in params['aug_folders']:
-            df_new = df_train.copy()
-            df_new['file.vis'] = aug_folder + df_new['file.vis']
-            df_list.append(df_new)
-        df_train = pd.concat(df_list).reset_index(drop = True )
-        print(df_train['file.vis'])
+        if 'aug_file' in params and params['aug_file'] is not None: 
+            df_aug = pd.read_csv(params['aug_file'] , index_col = 'file.vis')
+            df_aug = df_aug.loc[df_train['file.vis'],:]
+            df_aug.reset_index(inplace = True)
+
+            df_aug['file.vis'] = aug_folder + df_aug['file.vis']
+
+            df_train = pd.concat([df_train,df_aug]).reset_index(drop = True )
+
 
     # Create the name using some of the configuratation.
     print(params['category'])
