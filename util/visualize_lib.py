@@ -50,7 +50,7 @@ def show_one_masks(plt, img, pred_mask, gt_mask, fig_name = "", save_path = None
         plt.title(fig_name , fontsize = 20)
 
 
-    alpha = 0.3
+    alpha = 0.5
     
 
     intersection = np.logical_and(gt_mask , pred_mask)
@@ -75,7 +75,7 @@ def show_one_masks(plt, img, pred_mask, gt_mask, fig_name = "", save_path = None
         if not os.path.exists(save_path):
             os.makedirs(save_path)
         plt.axis('off')
-        plt.savefig(save_path + fig_name+'.'+format ,bbox_inches='tight',format = format)
+        plt.savefig(save_path + fig_name+'.'+format ,bbox_inches='tight',format = format,pad_inches=0)
         plt.close("all")
         plt.clf()
 
@@ -286,7 +286,7 @@ def show_markups(imgs , pred_coords = None , pred_patches =None , pred_contours=
 
 def show_one_markup(plt, img, pred_coord , pred_patch , pred_contour,
     gt_coord  , gt_patch, gt_contour,pck_threshold, fig_name = "" , LM_CNT =15, save_path = None,
-    linewidth = 3,
+    linewidth = 3, label_names = None,
     show_patch_labels = False , show_colour_labels = False , show_fig_title = True , format = 'png'):
     """
     Plot one image and markup using show_coords and show_patches
@@ -303,13 +303,13 @@ def show_one_markup(plt, img, pred_coord , pred_patch , pred_contour,
         plt.title(fig_name , fontsize = 20)
     plt.imshow(img)
     # Show the predict mark and pred_patch
-    show_patches(plt, pred_patch,'deepskyblue' , show_patch_labels = show_patch_labels,linewidth=linewidth)
+    show_patches(plt, pred_patch,'deepskyblue' , show_patch_labels = show_patch_labels,linewidth=linewidth , label_names = label_names)
     show_patches(plt, pred_contour,'deepskyblue' ,linewidth=linewidth )
-    show_coords(plt, pred_coord, pck_threshold,'deepskyblue' , LM_CNT = LM_CNT , show_patch_labels= show_patch_labels)
+    show_coords(plt, pred_coord, pck_threshold,'deepskyblue' , LM_CNT = LM_CNT , show_patch_labels= show_patch_labels, label_names = label_names)
 
-    show_patches(plt, gt_patch, 'red',linewidth=linewidth)
+    show_patches(plt, gt_patch, 'red',linewidth=linewidth, label_names = label_names)
     show_patches(plt, gt_contour , 'red', show_patch_labels = show_patch_labels,linewidth=linewidth)
-    show_coords(plt, gt_coord, pck_threshold, 'red' , LM_CNT = LM_CNT)
+    show_coords(plt, gt_coord, pck_threshold, 'red' , LM_CNT = LM_CNT, label_names = label_names)
     
     img_height, img_width = img.shape[0:2]
 
@@ -346,7 +346,7 @@ patches_names = ['s1','s2','s3','s4','s5', 'crown', 'nape','mantle', 'rump', 'ta
 
 # patches_names = np.arange(1,16).astype(str)
 
-def show_coords(plt, coord ,pck_threshold = None, color = 'deepskyblue' , LM_CNT = 16,show_patch_labels = False):
+def show_coords(plt, coord ,pck_threshold = None, color = 'deepskyblue' , LM_CNT = 16,show_patch_labels = False , label_names = None):
     """
     Plot the 2D points on figure
 
@@ -377,13 +377,13 @@ def show_coords(plt, coord ,pck_threshold = None, color = 'deepskyblue' , LM_CNT
                 axis_width = np.max(plt.gca().get_xlim())
                 axis_height = np.max(plt.gca().get_ylim())
                 plt.text(x/axis_width , 1-(y/axis_height-0.02) ,
-                    patches_names[i_col], 
+                    label_names[i_col], 
                     fontdict={'color': color,'size':12 },
                     transform=plt.gca().transAxes)
     # Write the labels at the text. 
 
 
-def show_patches(plt,patch, color = 'deepskyblue' , show_patch_labels = False, linewidth=3 ):
+def show_patches(plt,patch, color = 'deepskyblue' , show_patch_labels = False, linewidth=3 , label_names = None):
     """
     Plot the patches on figure
 
@@ -407,7 +407,7 @@ def show_patches(plt,patch, color = 'deepskyblue' , show_patch_labels = False, l
                 plt.plot(x,y,color = color,lw =linewidth , alpha =0.8)
             if show_patch_labels:
                 plt.text(p_coord[0] , p_coord[1]*0.95,
-                    patches_names[id_p], 
+                    label_names[id_p], 
                     fontdict={'color': color,'size':12 })
                 
                 
